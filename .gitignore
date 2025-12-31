@@ -1,0 +1,18 @@
+# exclude directory
+**/build/
+**/CMakeFiles/
+**/__*py*__/
+**/__pycache__/
+**/release/
+
+# exclude files
+**/*.cmake
+**/CMakeCache.txt
+.DS_Store
+*.bak
+**/release/TID_*/*.html
+**/release/testResult/*.html
+README.pdf
+
+# include files
+# \!build/*.dll

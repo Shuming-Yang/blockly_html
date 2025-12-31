@@ -1,0 +1,27 @@
+# 忽略 Git 相關
+.git/
+.gitignore
+
+# 忽略開發設定檔
+.vscode/
+.vscodeignore
+jsconfig.json
+tsconfig.json
+**/*.map
+
+# 忽略 Node.js 依賴 (看情況)
+# 如果您的 extension 執行時不需要任何 npm 套件(通常 simple webview 不需要)，可以忽略它來縮小體積
+# 但如果您不確定，先不要加這行，讓 vsce 自動判斷
+# node_modules/
+
+# 忽略測試檔
+test/
+**/*.test.js
+.vscode-test.mjs
+
+# 忽略原始碼 (如果不希望發布原始碼)
+# 但通常 index.html 和 extension.js 必須保留
+
+# --- 說明文件 (視需求保留) ---
+# README.md (通常會保留)
+# CHANGELOG.md (通常會保留)

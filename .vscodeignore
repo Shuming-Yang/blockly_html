@@ -1,0 +1,29 @@
+# --- 編譯產出與中間檔案 (最重要！) ---
+build/
+release/
+dist/
+out/
+venv/
+doc/
+__pycache__/
+*.spec
+
+# --- 原始碼與開發工具 (使用者不需要這些) ---
+CMakeLists.txt
+index.py
+.gitignore
+.vscodeignore
+.git/
+.github/
+.vscode/
+
+# --- Node.js 開發檔案 ---
+node_modules/
+package-lock.json
+yarn.lock
+webpack.config.js
+tsconfig.json
+
+# --- 說明文件 (視需求保留) ---
+# README.md (通常會保留)
+# CHANGELOG.md (通常會保留)

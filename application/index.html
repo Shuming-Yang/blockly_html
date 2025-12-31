@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blockly VS Code Integration</title>
+    
+    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+    
+    <script src="blockly/python_compressed.js"></script>
+    
+    <script src="script/python_custom.js"></script>
+    <script src="script/index.js"></script>
+
+    <script>
+    // ==========================================
+    //  取代 alert 的 Toast 通知函式
+    // ==========================================
+    function showToast(message) {
+        var x = document.getElementById("toast");
+        x.innerText = message; // 設定文字
+        x.className = "show";  // 顯示
+        
+        // 3秒後自動消失
+        setTimeout(function(){ 
+            x.className = x.className.replace("show", ""); 
+        }, 3000);
+    }
+
+    // ==========================================
+    //  簡易深色模式切換
+    // ==========================================
+    function toggleDarkMode() {
+        document.body.classList.toggle('dark-theme');
+        
+        // 判斷目前是否為深色，給予提示
+        if (document.body.classList.contains('dark-theme')) {
+            showToast('已切換為深色模式 (介面)');
+            // 如果要更進階，這裡可以呼叫 Blockly 的 Theme API
+            // workspace.setTheme(Blockly.Themes.Dark); 
+        } else {
+            showToast('已切換為淺色模式');
+            // workspace.setTheme(Blockly.Themes.Classic);
+        }
+    }
+    </script>
+
+    <style>
+        /* ========================================= */
+        /* 全域設定 */
+        /* ========================================= */
+        body {
+            margin: 0;
+            height: 100vh;      /* 高度佔滿整個視窗 */
+            display: flex;      /* 啟用左右佈局 */
+            overflow: hidden;   /* 防止出現最外層捲軸 */
+            font-family: '微軟正黑體', sans-serif;
+            background-color: #fff;
+        }
+
+        /* ========================================= */
+        /* 左邊主畫面區域 (85%) - 放置 Blockly */
+        /* ========================================= */
+        .main-area {
+            flex: 8.5;           /* 佔 8.5/10 的寬度 */
+            display: flex;       /* 讓內部再做垂直切割 */
+            flex-direction: column; 
+            background-color: #fff;
+            position: relative;  
+            height: 100%;        
+            min-width: 0;        /* Flexbox 巢狀佈局的重要設定，防止溢出 */
+        }
+
+        /* Blockly 標題與控制列 */
+        .blockly-header {
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-bottom: 1px solid #ccc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 50px;      
+            box-sizing: border-box; /* 確保 padding 不會撐大高度 */
+        }
+
+        .blockly-header h1 {
+            margin: 0;
+            font-size: 1.2rem;
+            color: #333;
+        }
+
+        /* Blockly 畫布容器 (最重要的部分) */
+        #blocklyDiv {
+            flex: 1;            /* 佔滿剩餘的所有高度 */
+            width: 100%;        
+            position: relative; /* 確保 Blockly 注入位置正確 */
+        }
+
+        /* 預覽輸出區塊 */
+        #outputPane {
+            display: none;      /* 預設隱藏 */
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 400px;
+            height: 300px;
+            background: white;
+            border: 1px solid #ddd;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            z-index: 100;
+            padding: 10px;
+            flex-direction: column;
+            border-radius: 8px;
+        }
+        
+        #generatedCode {
+            flex: 1;
+            background-color: #f7f0e4;
+            margin: 0;
+            overflow: auto;
+            font-size: 13px;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap; /* 自動換行 */
+        }
+
+        /* ========================================= */
+        /* 右邊側邊欄區域 (15%) */
+        /* ========================================= */
+        .sidebar {
+            flex: 1.5;          
+            background-color: #2d2d2d;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.2);
+            z-index: 10;   
+            min-width: 150px;   /* 防止側邊欄太窄 */
+        }
+
+        .sidebar button {
+            padding: 12px;
+            font-size: 14px;
+            cursor: pointer;
+            background-color: #007acc;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            transition: 0.2s;
+        }
+
+        .sidebar button:hover {
+            background-color: #0098ff;
+        }
+        
+        .btn-export {
+            background-color: #28a745 !important;
+        }
+        .btn-export:hover {
+            background-color: #34d058 !important;
+        }
+        /* ========================================= */
+        /* Toast 通知訊息樣式 (取代 alert)          */
+        /* ========================================= */
+        #toast {
+            visibility: hidden; /* 預設隱藏 */
+            min-width: 250px;
+            margin-left: -125px; /* 為了置中 */
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 4px;
+            padding: 16px;
+            position: fixed;
+            z-index: 999;
+            left: 50%;
+            bottom: 30px;
+            font-size: 14px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            opacity: 0;
+            transition: opacity 0.5s, bottom 0.5s;
+        }
+
+        /* 顯示時的樣式 */
+        #toast.show {
+            visibility: visible;
+            opacity: 1;
+            bottom: 50px; /* 稍微往上浮動的效果 */
+        }
+
+        /* ========================================= */
+        /* 深色模式 (Dark Mode)                     */
+        /* ========================================= */
+        /* 當 body 加上 .dark-theme 時，改變變數或顏色 */
+        body.dark-theme {
+            background-color: #1e1e1e;
+            color: #ccc;
+        }
+        
+        /* 深色模式下的左側區域 */
+        body.dark-theme .main-area {
+            background-color: #1e1e1e;
+        }
+        
+        /* 深色模式下的標題列 */
+        body.dark-theme .blockly-header {
+            background-color: #252526;
+            border-bottom: 1px solid #3e3e3e;
+        }
+        
+        body.dark-theme .blockly-header h1 {
+            color: #fff;
+        }
+
+        /* 深色模式下的 Blockly 背景 (畫布本身通常由 Blockly API 控制，這裡改外框) */
+        body.dark-theme #blocklyDiv {
+            background-color: #1e1e1e; 
+        }
+    </style>
+</head>
+
+<body onload="initApp()">
+
+    <div class="main-area">
+        <div class="blockly-header">
+            <h1>積木程式編輯器</h1>
+            <div class="controls">
+                <span style="font-size:12px; color:#666;">Ready</span>
+            </div>
+        </div>
+
+        <div id="blocklyDiv"></div>
+
+        <div id="outputPane">
+            <h4 style="margin-top:0; margin-bottom:5px;">Python 輸出預覽：</h4>
+            <pre id="generatedCode"><code></code></pre>
+            <button onclick="document.getElementById('outputPane').style.display='none'" style="margin-top:5px;">關閉</button>
+        </div>
+    </div>
+
+    <div class="sidebar">
+        <button id="saveButton" class="btn-export" onclick="exportPython()">輸出 Python 程式碼</button>
+        
+        <hr style="border: 0.5px solid #555; width: 100%;">
+        
+        <button onclick="toggleDarkMode()">切換深色/淺色模式</button>
+        <button onclick="showToast('功能開發中，敬請期待！')">其他功能</button>
+    </div>
+
+    <div id="toast">訊息提示</div>
+
+    <script>
+        // 初始化函式
+        function initApp() {
+            console.log("App initializing...");
+            // 呼叫 script/index.js 中的 start()
+            if (typeof start === 'function') {
+                start(); 
+            } else {
+                console.error("找不到 start() 函式，請檢查 script/index.js 是否載入成功");
+            }
+        }
+
+        // 輸出按鈕功能
+        function exportPython() {
+            // 這裡主要觸發 UI 顯示，實際邏輯由 index.js 的 EventListener 處理
+            const pane = document.getElementById('outputPane');
+            pane.style.display = 'flex';
+        }
+    </script>
+
+</body>
+</html>
