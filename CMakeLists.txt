@@ -1,12 +1,17 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.10)
 PROJECT(HelloWorldExtension)
 
+SET(EXT "")
+IF(WIN32)
+    SET(EXT ".exe")
+ENDIF()
+
 # =============================================================
 # 1. 環境檢測與相依性安裝 (DEPENDENCY CHECK & INSTALL)
 # =============================================================
 
 # (A) 尋找 Node.js
-FIND_PROGRAM(NODE_EXECUTABLE NAMES node node.exe)
+FIND_PROGRAM(NODE_EXECUTABLE NAMES node node${EXT})
 # 預設不開啟 VSIX 打包，直到通過層層檢查
 SET(ENABLE_VSIX_PACKAGING FALSE)
 IF(NODE_EXECUTABLE)
@@ -57,12 +62,13 @@ SET(RESOURCE_DIR "${CMAKE_SOURCE_DIR}/application")
 SET(PYTHON_SCRIPT "${RESOURCE_DIR}/index.py") 
 SET(RELEASE_DIR "${CMAKE_SOURCE_DIR}/release")
 SET(VSCODE_EXT_DIR "${CMAKE_SOURCE_DIR}/vscode_ext")
-SET(APP_ICON "${CMAKE_SOURCE_DIR}/py_exe/icon.ico")
+SET(PY_EXE_DIR "${CMAKE_SOURCE_DIR}/py_exe")
+SET(APP_ICON "${PY_EXE_DIR}/icon.ico")
 # 虛擬環境路徑
 SET(VENV_DIR "${CMAKE_SOURCE_DIR}/venv")
-SET(VENV_PYTHON "${VENV_DIR}/Scripts/python.exe")
-SET(VENV_PIP "${VENV_DIR}/Scripts/pip.exe")
-SET(VENV_PYINSTALLER "${VENV_DIR}/Scripts/pyinstaller.exe")
+SET(VENV_PYTHON "${VENV_DIR}/Scripts/python${EXT}")
+SET(VENV_PIP "${VENV_DIR}/Scripts/pip${EXT}")
+SET(VENV_PYINSTALLER "${VENV_DIR}/Scripts/pyinstaller${EXT}")
 # 建立最終任務清單 (Python EXE 是必備的)
 SET(FINAL_DEPENDENCIES package_exe)
 
@@ -85,6 +91,7 @@ ADD_CUSTOM_TARGET(package_exe
                                     --icon "${APP_ICON}"
                                     --add-data "${RESOURCE_DIR};."
                                     --exclude-module tkinter
+                                    --version-file ${PY_EXE_DIR}/${EXE_NAME}.txt
                                     --distpath "${RELEASE_DIR}"
                                     --specpath "${CMAKE_BINARY_DIR}"
                                     --workpath "${CMAKE_BINARY_DIR}/pyinstaller_temp"
@@ -107,7 +114,7 @@ IF(ENABLE_VSIX_PACKAGING)
         # 3. 安裝依賴 (使用 npm ci 進行乾淨安裝，需 package-lock.json)
         COMMAND npm ci
         # 4. 執行打包 (輸出到 release 目錄)
-        COMMAND npx --no-install vsce package --out "${RELEASE_DIR}/extension.vsix"
+        COMMAND npx --no-install vsce package --allow-missing-repository --out "${RELEASE_DIR}/extension.vsix"
         # 5. 打印版本號 (讀取 package.json)
         COMMAND "${NODE_EXECUTABLE}" -e "console.log('\\nPackaged Version: ' + require('./package.json').version + '\\n')"
         # ★ 設定工作目錄在 vscode_ext 裡面

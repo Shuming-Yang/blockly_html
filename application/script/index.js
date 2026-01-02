@@ -179,7 +179,7 @@ const customBlocksJson = [
   },
   {
     "type": "set_var",
-    "message0": "set %1 to %2",
+    "message0": "set %1 from %2",
     "args0": [
       {
         "type": "field_dropdown", "name": "var_sel", "options": [
@@ -314,7 +314,7 @@ const toolbox = {
 };
 
 // =============================================================
-// 4. 初始化函式 (start) - 含 VS Code 修補邏輯
+// 4. 初始化函式 (start) - 修改為離線配置
 // =============================================================
 function start() {
   console.log("Blockly injecting...");
@@ -323,9 +323,8 @@ function start() {
   workspace = Blockly.inject('blocklyDiv', {
     toolbox: toolbox,
     
-    // ★ 關鍵修補 1: 使用 CDN 媒體路徑
-    // 解決 VS Code Webview 找不到本地 svg (如垃圾桶/縮放圖示) 的問題
-    media: 'https://unpkg.com/blockly/media/',
+    // 指向本地 blockly/media 資料夾 (路徑相對於 index.html)
+    media: 'blockly/media/',
     
     scrollbars: true,
     zoom: {
@@ -339,8 +338,7 @@ function start() {
     trashcan: true
   });
 
-  // ★ 關鍵修補 2: 強制重繪 (Force Resize)
-  // 解決 VS Code Flex 佈局初始化延遲導致高度為 0 (白畫面) 的問題
+  // 強制重繪 (防止初始化時高度為 0)
   setTimeout(function() {
       window.dispatchEvent(new Event('resize'));
       console.log("Blockly forced resize executed.");
@@ -362,8 +360,8 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
       }
 
-      // 檢查 Python 生成器是否存在
-      // 根據您的載入方式，它可能在 'python.pythonGenerator' 或 'Blockly.Python'
+      // 檢查 Python 生成器
+      // 使用的是 *_compressed.js，通常它會掛載在 Blockly.Python 底下
       let generator = null;
       if (typeof python !== 'undefined' && python.pythonGenerator) {
           generator = python.pythonGenerator;
@@ -388,7 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
           }
       } else {
           console.error("找不到 Python Generator，請檢查 python_custom.js 是否正確載入");
-          if (codePre) codePre.innerText = "Error: Python Generator not found.";
+          if (codePre) codePre.innerText = "Error: Python Generator not found. 請檢查 python_compressed.js 是否載入";
       }
     });
   }

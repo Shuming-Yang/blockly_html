@@ -4,6 +4,9 @@
 **/__*py*__/
 **/__pycache__/
 **/release/
+**/venv/
+**/vscode_ext/node_modules/
+**/vscode_ext/application/
 
 # exclude files
 **/*.cmake
@@ -16,3 +19,4 @@ README.pdf
 
 # include files
 # \!build/*.dll
+\!release/DevVerifyGUI.exe

@@ -12,7 +12,7 @@ Description:
     - CMake-driven build for native libraries
 """
 # WARNING
-# pylint: disable=C0116, E0401, W0212
+# pylint: disable=C0115, C0116, E0401, W0212
 import os
 import sys
 import time
@@ -33,6 +33,17 @@ def get_resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
+# 定義 Python API 供 JS 呼叫
+class Api:
+    def process_data(self, data):
+        print(f"接收到 JS 資料: {data}")
+        # 這裡可以做你的邏輯處理
+        return f"已收到 '{data}'，處理完成！"
+
+    def start_logic(self):
+        print("Python 邏輯啟動")
+
+
 def run_index():
     # 1. 取得正確的 HTML 路徑
     html_path = get_resource_path(os.path.join('index.html'))
@@ -40,10 +51,12 @@ def run_index():
     if not os.path.exists(html_path):
         print(f"嚴重錯誤：找不到檔案 {html_path}")
         return
+    api = Api()
     # 2. 建立視窗 (先給一個預設大小，稍後會馬上最大化)
     window = webview.create_window(
         title='專案儀表板 (獨立執行版)',
         url=html_path,
+        js_api=api,
         width=1024,
         height=768,
         resizable=True
