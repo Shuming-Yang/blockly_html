@@ -1,6 +1,6 @@
 {
-  "name": "helloworld",
-  "displayName": "helloworld",
+  "name": "devverifygui",
+  "displayName": "DevVerifyGUI",
   "description": "",
   "version": "0.0.4",
   "publisher": "aes",
@@ -17,15 +17,15 @@
   "contributes": {
     "commands": [
       {
-        "command": "helloworld.helloWorld",
-        "title": "開啟 Hello World 面板"
+        "command": "devverifygui.devverifygui",
+        "title": "開啟 DevVerifyGUI 面板"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
           "id": "my-trigger-sidebar",
-          "title": "啟動 Dashboard",
+          "title": "啟動 DevVerifyGUI",
           "icon": "icon.png"
         }
       ]
