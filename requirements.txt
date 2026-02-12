@@ -1,0 +1,6 @@
+pywebview
+pyinstaller
+matplotlib
+psutil
+debugpy
+nuitka

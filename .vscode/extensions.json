@@ -1,88 +1,372 @@
 {
-	// See https://go.microsoft.com/fwlink/?LinkId=733558
-	// for the documentation about the extensions.json format
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the extensions.json format
     "recommendations": [
-        "aaron-bond.better-comments",
-        "alefragnani.project-manager",
-        "analytic-signal.preview-pdf",
-        "bierner.markdown-emoji",
-        "bierner.markdown-mermaid",
-        "bierner.markdown-preview-github-styles",
-        "bpruitt-goddard.mermaid-markdown-syntax-highlighting",
-        "charleswan.markdown-toc",
-        "chrischinchilla.vscode-pandoc",
-        "cschlosser.doxdocgen",
-        "darkriszty.markdown-table-prettify",
-        "dbaeumer.vscode-eslint",
-        "deadpoulpe.custom-md-pdf",
-        "donjayamanne.githistory",
-        "donjayamanne.python-environment-manager",
-        "donjayamanne.python-extension-pack",
-        "flyfly6.terminal-in-status-bar",
-        "fougas.msys2",
-        "goessner.mdmath",
-        "google.gemini-cli-vscode-ide-companion",
-        "google.geminicodeassist",
-        "grapecity.gc-excelviewer",
-        "gruntfuggly.todo-tree",
-        "ibm.output-colorizer",
-        "james-yu.latex-workshop",
-        "josetr.cmake-language-support-vscode",
-        "kelvin.vscode-sshfs",
-        "kevinrose.vsc-python-indent",
-        "koehlma.markdown-math",
-        "kruemelkatze.vscode-dashboard",
-        "leojhonsong.python-extension-pack",
-        "llvm-vs-code-extensions.vscode-clangd",
-        "marp-team.marp-vscode",
-        "mcu-debug.debug-tracker-vscode",
-        "mcu-debug.memory-view",
-        "mechatroner.rainbow-csv",
-        "mhutchie.git-graph",
-        "mindaro-dev.file-downloader",
-        "ms-dotnettools.vscode-dotnet-runtime",
-        "ms-python.autopep8",
-        "ms-python.black-formatter",
-        "ms-python.debugpy",
-        "ms-python.flake8",
-        "ms-python.isort",
-        "ms-python.pylint",
+        // ----------------------------------------------------------------
+        // Python 開發相關
+        // ----------------------------------------------------------------
+
+        // ms-python.python
+        // 功能：VS Code 的核心 Python 支援，提供除錯、IntelliSense、程式碼導覽等基礎功能 (必裝)。
         "ms-python.python",
+
+        // ms-python.pylint
+        // 功能：我們專案指定使用的程式碼語法與品質檢查工具 (Linter)。
+        "ms-python.pylint",
+
+        // ms-python.vscode-pylance
+        // 功能：微軟官方高效能語言伺服器。負責 IntelliSense (自動補全) 與靜態型別檢查。
+        // 與 Pylint 互補：Pylance 抓型別錯誤，Pylint 抓邏輯與風格規範。
         "ms-python.vscode-pylance",
+
+        // ms-python.debugpy
+        // 功能：Python 除錯器核心，支援中斷點、變數監看等除錯功能。
+        "ms-python.debugpy",
+
+        // ms-python.autopep8
+        // 功能：傳統且較溫和的 Python 格式化工具。
+        // 用於修正縮排與空格以符合 PEP 8，但不會像 Black 那樣強制重寫整個檔案結構。
+        "ms-python.autopep8",
+
+        // ms-python.vscode-python-envs
+        // 功能：協助管理與偵測 Python 虛擬環境 (Venv/Conda) 的 API 支援。
         "ms-python.vscode-python-envs",
-        "ms-vscode-remote.remote-containers",
+
+        // donjayamanne.python-environment-manager
+        // 功能：提供一個視覺化面板，查看並管理電腦中所有的 Python 環境與套件。
+        "donjayamanne.python-environment-manager",
+
+        // kevinrose.vsc-python-indent
+        // 功能：更聰明的 Python 縮排行為，解決換行時縮排不正確的痛點。
+        "kevinrose.vsc-python-indent",
+
+        // njpwerner.autodocstring
+        // 功能：快速生成 Python 函式/類別的 docstring (文件註解)，支援 Google/Numpy 等格式。
+        "njpwerner.autodocstring",
+
+        // nikolapaunovic.tkinter-snippets
+        // 功能：提供 Python Tkinter GUI 開發常用的程式碼片段 (Snippets)，加速介面開發。
+        "nikolapaunovic.tkinter-snippets",
+
+        // ----------------------------------------------------------------
+        // HTML & Java Script 開發相關
+        // ----------------------------------------------------------------
+        // dbaeumer.vscode-eslint
+        // 功能：dbaeumer.vscode-eslint 是 VS Code 中最權威的 JavaScript 與 TypeScript 語法檢查工具。 它是 JavaScript 版本的 Pylint。
+        "dbaeumer.vscode-eslint",
+
+        // ----------------------------------------------------------------
+        // C/C++ 與嵌入式開發 (Embedded/MCU)
+        // ----------------------------------------------------------------
+
+        // ms-vscode.cpptools-extension-pack
+        // 功能：C/C++ 開發懶人包，包含 C/C++ 核心工具、CMake 工具與主題。
+        "ms-vscode.cpptools-extension-pack",
+
+        // ms-vscode.cpptools
+        // 功能：微軟官方 C/C++ 核心支援，提供 IntelliSense、除錯與程式碼瀏覽。
+        "ms-vscode.cpptools",
+
+        // ms-vscode.cpptools-themes
+        // 功能：提供 C/C++ 專屬的語法高亮主題。
+        "ms-vscode.cpptools-themes",
+
+        // llvm-vs-code-extensions.vscode-clangd
+        // 功能：基於 LLVM 的 C/C++ 語言伺服器，提供極快且準確的跳轉與補全 (可作為 cpptools 的替代或補充)。
+        "llvm-vs-code-extensions.vscode-clangd",
+
+        // vadimcn.vscode-lldb
+        // 功能：CodeLLDB 除錯器，對於某些原生 C/C++ 或 Rust 專案提供更強大的除錯支援。
+        "vadimcn.vscode-lldb",
+
+        // sumfish.cpp-checker-misra
+        // 功能：檢查 C/C++ 程式碼是否符合 MISRA 標準 (汽車與嵌入式系統常用的安全規範)。
+        "sumfish.cpp-checker-misra",
+
+        // mcu-debug.debug-tracker-vscode
+        // 功能：嵌入式開發專用，可追蹤 MCU 的暫存器與記憶體狀態。
+        "mcu-debug.debug-tracker-vscode",
+
+        // mcu-debug.memory-view
+        // 功能：提供記憶體檢視器 (Memory View)，直接查看 Hex/ASCII 記憶體區塊，適合韌體除錯。
+        "mcu-debug.memory-view",
+
+        // ms-vscode.vscode-serial-monitor
+        // 功能：序列埠 (Serial Port) 監控工具，不需切換視窗即可查看 UART 輸出。
+        "ms-vscode.vscode-serial-monitor",
+
+        // ms-vscode.hexeditor
+        // 功能：二進位檔案編輯器，可直接在 VS Code 中以 Hex 模式查看與編輯檔案。
+        "ms-vscode.hexeditor",
+
+        // ms-vscode.makefile-tools
+        // 功能：提供對 Makefile 專案的 IntelliSense 與建置支援。
+        "ms-vscode.makefile-tools",
+
+
+        // ----------------------------------------------------------------
+        // CMake 建置系統
+        // ----------------------------------------------------------------
+
+        // ms-vscode.cmake-tools
+        // 功能：微軟官方 CMake 工具，支援 Configure、Build、Test 流程整合。
+        "ms-vscode.cmake-tools",
+
+        // twxs.cmake
+        // 功能：提供 CMakeLists.txt 語法高亮與自動補全 (社群熱門版)。
+        "twxs.cmake",
+
+        // josetr.cmake-language-support-vscode
+        // 功能：提供 CMake 語言的語法支援與說明文件提示。
+        "josetr.cmake-language-support-vscode",
+
+        // zchrissirhcz.cmake-highlight
+        // 功能：針對 CMake 輸出與語法提供額外的高亮顯示。
+        "zchrissirhcz.cmake-highlight",
+
+
+        // ----------------------------------------------------------------
+        // 文件撰寫 (Markdown, LaTeX, PDF)
+        // ----------------------------------------------------------------
+
+        // yzhang.markdown-all-in-one
+        // 功能：Markdown 必裝套件，提供快捷鍵、目錄生成、列表編輯等全方位功能。
+        "yzhang.markdown-all-in-one",
+
+        // bierner.markdown-mermaid
+        // 功能：在 Markdown 預覽中直接繪製並顯示 Mermaid 流程圖與圖表。
+        "bierner.markdown-mermaid",
+
+        // bpruitt-goddard.mermaid-markdown-syntax-highlighting
+        // 功能：為 Markdown 中的 Mermaid 程式碼區塊提供語法顏色高亮。
+        "bpruitt-goddard.mermaid-markdown-syntax-highlighting",
+
+        // shd101wyy.markdown-preview-enhanced
+        // 功能：更強大的 Markdown 預覽工具，支援數學公式、流程圖、匯出 PDF/HTML 等多種格式。
+        "shd101wyy.markdown-preview-enhanced",
+
+        // charleswan.markdown-toc
+        // 功能：自動為 Markdown 文件生成與更新目錄 (Table of Contents)。
+        "charleswan.markdown-toc",
+
+        // marp-team.marp-vscode
+        // 功能：將 Markdown 文件快速轉換為簡報 (Slide Deck)，支援 PDF/PPTX 匯出。
+        "marp-team.marp-vscode",
+
+        // zcs.md-ppt
+        // 功能：另一個將 Markdown 轉為 PPT 簡報的工具。
+        "zcs.md-ppt",
+
+        // goessner.mdmath
+        // 功能：在 Markdown 中支援 LaTeX 數學公式顯示。
+        "goessner.mdmath",
+
+        // koehlma.markdown-math
+        // 功能：同樣用於支援 Markdown 內的數學公式渲染 (不需複雜設定)。
+        "koehlma.markdown-math",
+
+        // james-yu.latex-workshop
+        // 功能：最強大的 LaTeX 編輯擴充，包含編譯、預覽、參考文獻管理等完整功能。
+        "james-yu.latex-workshop",
+
+        // chrischinchilla.vscode-pandoc
+        // 功能：整合 Pandoc，將 Markdown 轉換為 Word、PDF 等多種文件格式。
+        "chrischinchilla.vscode-pandoc",
+
+        // cschlosser.doxdocgen
+        // 功能：Doxygen 文件註解產生器，適合 C/C++ 專案生成標準 API 文件。
+        "cschlosser.doxdocgen",
+
+        // analytic-signal.preview-pdf
+        // 功能：直接在 VS Code 內開啟與預覽 PDF 檔案。
+        "analytic-signal.preview-pdf",
+
+        // deadpoulpe.custom-md-pdf
+        // 功能：高度可客製化的 Markdown 轉 PDF 工具。
+        "deadpoulpe.custom-md-pdf",
+
+        // bierner.markdown-emoji
+        // 功能：在 Markdown 中輸入 `:smile:` 時提供 Emoji 自動補全與預覽。
+        "bierner.markdown-emoji",
+
+        // bierner.markdown-preview-github-styles
+        // 功能：讓 Markdown 預覽樣式與 GitHub 網站風格保持一致。
+        "bierner.markdown-preview-github-styles",
+
+        // darkriszty.markdown-table-prettify
+        // 功能：自動排版與對齊 Markdown 表格，讓原始碼更整潔易讀。
+        "darkriszty.markdown-table-prettify",
+
+        // zaaack.markdown-editor
+        // 功能：提供類似 Typora 的所見即所得 (WYSIWYG) Markdown 編輯體驗。
+        "zaaack.markdown-editor",
+
+
+        // ----------------------------------------------------------------
+        // 遠端開發 (Remote Development)
+        // ----------------------------------------------------------------
+
+        // ms-vscode-remote.vscode-remote-extensionpack
+        // 功能：微軟遠端開發懶人包，包含 SSH、WSL、Container (Docker) 等遠端連線工具。
+        "ms-vscode-remote.vscode-remote-extensionpack",
         "ms-vscode-remote.remote-ssh",
         "ms-vscode-remote.remote-ssh-edit",
         "ms-vscode-remote.remote-wsl",
-        "ms-vscode-remote.vscode-remote-extensionpack",
-        "ms-vscode.cmake-tools",
-        "ms-vscode.cpptools",
-        "ms-vscode.cpptools-extension-pack",
-        "ms-vscode.cpptools-themes",
-        "ms-vscode.extension-test-runner",
-        "ms-vscode.hexeditor",
-        "ms-vscode.live-server",
-        "ms-vscode.makefile-tools",
+        "ms-vscode-remote.remote-containers",
+        "ms-vscode-remote.remote-server",
         "ms-vscode.remote-explorer",
-        "ms-vscode.remote-server",
-        "ms-vscode.vscode-serial-monitor",
-        "nickdemayo.vscode-json-editor",
-        "nikolapaunovic.tkinter-snippets",
-        "njpwerner.autodocstring",
-        "oderwat.indent-rainbow",
+
+        // kelvin.vscode-sshfs
+        // 功能：透過 SSHFS 協定掛載遠端檔案系統，不需完整 SSH 連線即可編輯檔案。
+        "kelvin.vscode-sshfs",
+
+
+        // ----------------------------------------------------------------
+        // 專案管理與協作工具
+        // ----------------------------------------------------------------
+
+        // alefragnani.project-manager
+        // 功能：快速在不同的專案資料夾之間切換，可儲存專案列表。
+        "alefragnani.project-manager",
+
+        // zhucy.project-tree
+        // 功能：提供另一種視角的專案樹狀結構檢視。
+        "zhucy.project-tree",
+
+        // mhutchie.git-graph
+        // 功能：視覺化的 Git 線圖工具，方便查看 Commit 歷史與分支走向。
+        "mhutchie.git-graph",
+
+        // donjayamanne.githistory
+        // 功能：查看 Git 歷史記錄、搜尋 Commit、比較檔案變更。
+        "donjayamanne.githistory",
+
+        // gruntfuggly.todo-tree
+        // 功能：掃描專案中所有的 TODO、FIXME 標籤，並以樹狀圖列出以便追蹤待辦事項。
+        "gruntfuggly.todo-tree",
+
+        // google.geminicodeassist
+        // 功能：Google Gemini AI 程式碼助手，提供程式碼建議與聊天功能。
+        "google.geminicodeassist",
+
+        // google.gemini-cli-vscode-ide-companion
+        // 功能：Gemini CLI 的配套工具，增強終端機與 AI 的互動。
+        "google.gemini-cli-vscode-ide-companion",
+
+
+        // ----------------------------------------------------------------
+        // 實用小工具 (Utility)
+        // ----------------------------------------------------------------
+
+        //MS-CEINTL.vscode-language-pack-zh-hant
+        // 功能：中文 (繁體) 語言套件，讓 VS Code 提供本地化的使用者介面。
+        "MS-CEINTL.vscode-language-pack-zh-hant",
+
+        // aaron-bond.better-comments
+        // 功能：讓註解可以透過不同顏色區分 (如 ! 警告、? 疑問、TODO 等)，提升可讀性。
+        "aaron-bond.better-comments",
+
+        // pkief.material-icon-theme
+        // 功能：Material Design 風格的檔案圖示主題，讓檔案總管更美觀易辨識。
         "pkief.material-icon-theme",
-        "qrti.funclist",
+
+        // mechatroner.rainbow-csv
+        // 功能：以不同顏色高亮 CSV 檔案的各個欄位，讓 CSV 資料閱讀變得非常容易。
+        "mechatroner.rainbow-csv",
+
+        // grapecity.gc-excelviewer
+        // 功能：直接在 VS Code 中預覽 Excel 試算表 (.xlsx) 內容。
+        "grapecity.gc-excelviewer",
+
+        // mindaro-dev.file-downloader
+        // 功能：允許直接從 VS Code 介面下載遠端檔案。
+        "mindaro-dev.file-downloader",
+
+        // redhat.vscode-xml
+        // 功能：RedHat 官方 XML 語言支援，提供驗證、結構檢視與自動補全。
         "redhat.vscode-xml",
-        "ritwickdey.liveserver",
-        "shd101wyy.markdown-preview-enhanced",
-        "sumfish.cpp-checker-misra",
-        "twxs.cmake",
-        "vadimcn.vscode-lldb",
-        "yzhang.markdown-all-in-one",
-        "zaaack.markdown-editor",
+
+        // zainchen.json
+        // 功能：增強 JSON 檢視功能，方便解析複雜的 JSON 結構。
         "zainchen.json",
-        "zchrissirhcz.cmake-highlight",
-        "zcs.md-ppt",
-        "zhucy.project-tree"
+
+        // imgildev.vscode-json-flow
+        // 功能：將 JSON 檔案視覺化為互動式流程圖 (Graph/Flowchart)」
+        "imgildev.vscode-json-flow",
+
+        // nickdemayo.vscode-json-editor
+        // 功能：提供圖形化的介面來編輯 JSON 檔案，避免語法錯誤。
+        "nickdemayo.vscode-json-editor",
+
+        // ibm.output-colorizer
+        // 功能：為輸出視窗 (Output) 與 .log 檔案提供語法高亮，讓 Log 更容易閱讀。
+        "ibm.output-colorizer",
+
+        // oderwat.indent-rainbow
+        // 功能：將縮排區域填上彩虹背景色，幫助辨識縮排層級 (特別適合 Python)。
+        "oderwat.indent-rainbow",
+
+        // qrti.funclist
+        // 功能：列出目前檔案中的所有函式清單，方便快速導覽。
+        "qrti.funclist",
+
+        // flyfly6.terminal-in-status-bar
+        // 功能：在狀態列顯示終端機按鈕或簡易資訊。
+        "flyfly6.terminal-in-status-bar",
+
+        // ms-dotnettools.vscode-dotnet-runtime
+        // 功能：安裝 .NET Runtime，通常是其他擴充套件的依賴項 (Dependency)。
+        "ms-dotnettools.vscode-dotnet-runtime",
+
+        // ms-edgedevtools.vscode-edge-devtools
+        // 功能：在 VS Code 內整合 Edge 開發者工具，便於除錯 Web 內容 (如 Pywebview)。
+        "ms-edgedevtools.vscode-edge-devtools",
+
+        // ms-vscode.extension-test-runner
+        // 功能：用於執行 VS Code 擴充套件的測試 (主要用於擴充套件開發)。
+        "ms-vscode.extension-test-runner",
+
+        // fougas.msys2
+        // 功能：整合 MSYS2 環境，便於在 Windows 上使用 Linux 風格的工具鏈。
+        "fougas.msys2",
+
+        // kruemelkatze.vscode-dashboard
+        // 功能：「專案管理儀表板」 (Project Dashboard)
+        "kruemelkatze.vscode-dashboard"
+    ],
+    "unwantedRecommendations": [
+        // ----------------------------------------------------------------
+        // 禁止或不推薦使用的套件
+        // ----------------------------------------------------------------
+
+        // ms-python.flake8
+        // 功能：Python 語法檢查工具。
+        // 原因：請勿安裝，本專案統一使用 Pylint，以免兩者規則衝突產生混淆。
+        "ms-python.flake8",
+
+        // ms-python.black-formatter
+        // 功能：非常強勢的格式化工具，強制改成符合 PEP 8 的單一風格。
+        // 原因：專案暫不強制格式化，避免 Git 變動過大；請使用 autopep8 或手動調整。
+        "ms-python.black-formatter",
+
+        // ms-python.isort
+        // 功能：專門用來排序 import 的工具。
+        // 原因：Pylint 有時候會檢查 import 順序，若 isort 規則與 Pylint 不一致，會導致反覆報錯與修改。
+        "ms-python.isort",
+
+        // batisteo.vscode-django
+        // 功能：Django 框架的語法支援。
+        // 原因：本專案非 Django 網頁專案，安裝此套件會佔用資源且無實際用途。
+        "batisteo.vscode-django",
+
+        // wholroyd.jinja
+        // 功能：Jinja2 模板語言支援。
+        // 原因：除非涉及網頁模板渲染，否則不需要此套件。
+        "wholroyd.jinja",
+
+        // VisualStudioExptTeam.vscodeintellicode
+        // 功能：AI 輔助開發 (舊版)。
+        // 原因：建議使用 Pylance 或 Gemini Code Assist 等更新的工具替代。
+        "VisualStudioExptTeam.vscodeintellicode"
     ]
 }

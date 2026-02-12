@@ -5,9 +5,7 @@
             "C": "D:\\Software\\msys64\\mingw32\\bin\\gcc.exe",
             "CXX": "D:\\Software\\msys64\\mingw32\\bin\\g++.exe"
         },
-        "preferredGenerator": {
-            "name": "MinGW Makefiles"
-        },
+        "toolchainFile": "${workspaceFolder}\\tools\\ninja\\ninja_env.cmake",
         "environmentVariables": {
             "CMT_MINGW_PATH": "D:\\Software\\msys64\\mingw32\\bin",
             "MSYSTEM": "MINGW32",
@@ -22,9 +20,7 @@
             "C": "D:\\Software\\msys64\\mingw64\\bin\\gcc.exe",
             "CXX": "D:\\Software\\msys64\\mingw64\\bin\\g++.exe"
         },
-        "preferredGenerator": {
-            "name": "MinGW Makefiles"
-        },
+        "toolchainFile": "${workspaceFolder}\\tools\\ninja\\ninja_env.cmake",
         "environmentVariables": {
             "CMT_MINGW_PATH": "D:\\Software\\msys64\\mingw64\\bin",
             "MSYSTEM": "MINGW64",
@@ -34,59 +30,63 @@
         "isTrusted": true
     },
     {
-        "name": "GCC 14.2.0 64bits @Jeff.Chen",
+        "name": "GCC 15.2.0 64bits @Jeff.Chen",
         "compilers": {
-            "C": "D:\\Users\\jeff.chen\\Scoop\\apps\\msys2\\current\\mingw64\\bin\\gcc.exe",
-            "CXX": "D:\\Users\\jeff.chen\\Scoop\\apps\\msys2\\current\\mingw64\\bin\\g++.exe"
+            "C": "D:\\scoop\\apps\\msys2\\current\\mingw64\\bin\\gcc.exe",
+            "CXX": "D:\\scoop\\apps\\msys2\\current\\mingw64\\bin\\g++.exe"
         },
+        "toolchainFile": "${workspaceFolder}\\tools\\ninja\\ninja_env.cmake",
         "isTrusted": true,
         "environmentVariables": {
-            "CMT_MINGW_PATH": "D:\\Users\\jeff.chen\\Scoop\\apps\\msys2\\current\\mingw64\\bin",
+            "CMT_MINGW_PATH": "D:\\scoop\\apps\\msys2\\current\\mingw64\\bin",
             "MSYSTEM": "MINGW64",
             "MSYSTEM_PREFIX": "/mingw64",
-            "PATH": "D:\\Users\\jeff.chen\\Scoop\\apps\\msys2\\current\\mingw64\\bin;D:\\Users\\jeff.chen\\Scoop\\apps\\msys2\\current\\usr\\bin;${env:PATH}"
+            "PATH": "D:\\scoop\\apps\\msys2\\current\\mingw64\\bin;D:\\scoop\\apps\\msys2\\current\\usr\\bin;${env:PATH}"
         }
     },
     {
-        "name": "GCC 14.2.0 32bits @Jeff.Chen",
+        "name": "GCC 15.2.0 32bits @Jeff.Chen",
         "compilers": {
-            "C": "D:\\Users\\jeff.chen\\Scoop\\apps\\msys2\\current\\mingw32\\bin\\gcc.exe",
-            "CXX": "D:\\Users\\jeff.chen\\Scoop\\apps\\msys2\\current\\mingw32\\bin\\g++.exe"
+            "C": "D:\\scoop\\apps\\msys2\\current\\mingw32\\bin\\gcc.exe",
+            "CXX": "D:\\scoop\\apps\\msys2\\current\\mingw32\\bin\\g++.exe"
         },
+        "toolchainFile": "${workspaceFolder}\\tools\\ninja\\ninja_env.cmake",
         "isTrusted": true,
         "environmentVariables": {
-            "CMT_MINGW_PATH": "D:\\Users\\jeff.chen\\Scoop\\apps\\msys2\\current\\mingw32\\bin",
+            "CMT_MINGW_PATH": "D:\\scoop\\apps\\msys2\\current\\mingw32\\bin",
             "MSYSTEM": "MINGW32",
             "MSYSTEM_PREFIX": "/mingw32",
-            "PATH": "D:\\Users\\jeff.chen\\Scoop\\apps\\msys2\\current\\mingw32\\bin;D:\\Users\\jeff.chen\\Scoop\\apps\\msys2\\current\\usr\\bin;${env:PATH}"
+            "PATH": "D:\\scoop\\apps\\msys2\\current\\mingw32\\bin;D:\\scoop\\apps\\msys2\\current\\usr\\bin;${env:PATH}"
         }
     },
     {
-        "name": "GCC 14.12.0 64bits @Jean.Hung",
+        "name": "GCC 15.1.0 64bits @Jean.Hung",
         "compilers": {
-            "C": "D:\\msys64\\mingw64\\bin\\gcc.exe",
-            "CXX": "D:\\msys64\\mingw64\\bin\\g++.exe"
+            "C": "C:\\msys64\\mingw64\\bin\\gcc.exe",
+            "CXX": "C:\\msys64\\mingw64\\bin\\g++.exe"
         },
+        "toolchainFile": "${workspaceFolder}\\tools\\ninja\\ninja_env.cmake",
         "isTrusted": true,
         "environmentVariables": {
-            "CMT_MINGW_PATH": "D:\\msys64\\mingw64\\bin",
+            "CMT_MINGW_PATH": "C:\\msys64\\mingw64\\bin",
             "MSYSTEM": "MINGW64",
             "MSYSTEM_PREFIX": "/mingw64",
-            "PATH": "D:\\msys64\\mingw64\\bin;D:\\msys64\\usrr\\bin${env:PATH}"
+            "PATH": "C:\\msys64\\mingw64\\bin;C:\\msys64\\usrr\\bin${env:PATH}"
         }
     },
     {
-        "name": "GCC 14.12.0 32bits @Jean.Hung",
+        "name": "GCC 15.1.0 32bits @Jean.Hung",
         "compilers": {
-            "C": "D:\\msys64\\mingw32\\bin\\gcc.exe",
-            "CXX": "D:\\msys64\\mingw32\\bin\\g++.exe"
+            "C": "C:\\msys64\\mingw32\\bin\\gcc.exe",
+            "CXX": "C:\\msys64\\mingw32\\bin\\g++.exe"
         },
+        "toolchainFile": "${workspaceFolder}\\tools\\ninja\\ninja_env.cmake",
         "isTrusted": true,
         "environmentVariables": {
-            "CMT_MINGW_PATH": "D:\\msys64\\mingw32\\bin",
+            "CMT_MINGW_PATH": "C:\\msys64\\mingw32\\bin",
             "MSYSTEM": "MINGW32",
             "MSYSTEM_PREFIX": "/mingw32",
-            "PATH": "D:\\msys64\\mingw32\\bin;D:\\msys64\\usrr\\bin${env:PATH}"
+            "PATH": "C:\\msys64\\mingw32\\bin;C:\\msys64\\usrr\\bin${env:PATH}"
         }
     }
 ]

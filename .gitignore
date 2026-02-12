@@ -3,8 +3,10 @@
 **/CMakeFiles/
 **/__*py*__/
 **/__pycache__/
-**/release/
-**/venv/
+# **/release/
+**/release/index.dist/
+**/_internal/
+**/.venv/
 **/vscode_ext/node_modules/
 **/vscode_ext/application/
 
@@ -13,11 +15,10 @@
 **/CMakeCache.txt
 .DS_Store
 *.bak
-**/release/TID_*/*.html
-**/release/testResult/*.html
 README.pdf
 
 # include files
 # \!build/*.dll
-\!release/DevVerifyGUI.exe
 \!release/DevVerifyGUI.vsix
+\!release/mcu_i3c_beta.hex
+\!release/fpga_autotest.hex

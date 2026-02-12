@@ -3,7 +3,7 @@ build/
 release/
 dist/
 out/
-venv/
+.venv/
 doc/
 __pycache__/
 *.spec

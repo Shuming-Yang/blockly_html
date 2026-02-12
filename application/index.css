@@ -1,0 +1,279 @@
+
+
+/* ========================================= */
+/* 全域設定 */
+/* ========================================= */
+body {
+    margin: 0;
+    height: 100vh;      /* 高度佔滿整個視窗 */
+    display: flex;      /* 啟用左右佈局 */
+    overflow: hidden;   /* 防止出現最外層捲軸 */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    background-color: #fff;
+}
+/* ========================================= */
+/* 左邊主畫面區域 (85%) - 放置 Blockly */
+/* ========================================= */
+.main-area {
+    flex: 8.5;           /* 佔 8.5/10 的寬度 */
+    display: flex;       /* 讓內部再做垂直切割 */
+    flex-direction: column; 
+    background-color: #fff;
+    position: relative;  
+    height: 100%;        
+    min-width: 0;        /* Flexbox 巢狀佈局的重要設定，防止溢出 */
+}
+/* Blockly 標題與控制列 */
+.blockly-header {
+    padding: 10px;
+    background-color: #f0f0f0;
+    border-bottom: 1px solid #ccc;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 50px;      
+    box-sizing: border-box; /* 確保 padding 不會撐大高度 */
+}
+/* 標題左側群組設定 */
+.header-left {
+    display: flex;
+    align-items: center; /* 垂直置中對齊 */
+    gap: 10px;           /* 標題與選單的間距 */
+}
+.blockly-header h1 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: #333;
+    /* white-space: nowrap;  防止標題換行 (視情況開啟) */
+}
+/* 下拉選單樣式優化 */
+#boardSelect {
+    padding: 5px 10px;
+    font-size: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: white;
+    cursor: pointer;
+    font-weight: bold;
+    color: #007acc; /* 字體顏色用藍色凸顯它是可選的 */
+}
+#boardSelect:focus {
+    outline: none;
+    border-color: #007acc;
+}
+/* Blockly 畫布容器 (最重要的部分) */
+#blocklyDiv {
+    flex: 1;            /* 佔滿剩餘的所有高度 */
+    width: 100%;
+    height: 100%;
+    position: relative; /* 確保 Blockly 注入位置正確 */
+    min-height: 200px; /* 增加一個最小高度保險 */
+}
+/* ========================================= */
+/* 右邊側邊欄區域 (15%) */
+/* ========================================= */
+/* 側邊欄基礎樣式 */
+.sidebar {
+    width: 15%;            /* 改用固定寬度或基礎寬度 */
+    min-width: 150px;
+    background-color: #f5f5f5;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    box-shadow: -1px 0 0 #d0d0d0;
+    z-index: 10;
+    position: relative;
+    transition: all 0.3s ease; /* 寬度與 Padding 的過渡動畫 */
+}
+/* 收納狀態的樣式 */
+.sidebar.collapsed {
+    width: 40px;           /* 收納後的寬度 */
+    min-width: 40px;
+    padding: 20px 0;       /* 縮小左右間距 */
+}
+/* 功能群組容器 (白色卡片) */
+.sidebar-group {
+    background-color: #ffffff;  /* 白色背景 */
+    border: 1px solid #e0e0e0;  /* 極淡的邊框 */
+    border-radius: 8px;         /* 圓角 */
+    padding: 12px;              /* 內距 */
+    display: flex;
+    flex-direction: column;
+    gap: 10px;                  /* 按鈕之間的間距 */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05); /* 微微的浮起感 */
+}
+/* 確保中間的 Group 會撐開空間，把 About 擠到下面 */
+.sidebar-group:last-of-type {
+    margin-top: auto;
+}
+/* 群組小標題 */
+.group-title {
+    font-size: 12px;
+    font-weight: bold;
+    color: #888;
+    margin-bottom: 5px;
+    text-transform: uppercase; /* 轉大寫，看起來像標籤 */
+    letter-spacing: 0.5px;
+}
+/* 收納時隱藏群組 */
+.sidebar.collapsed .sidebar-group {
+    display: none !important;
+}
+/* 切換按鈕樣式 */
+.sidebar-toggle {
+    position: absolute;
+    left: -1px;           /* 凸出一點到主畫面區域方便點擊 */
+    top: 50%;
+    transform: translateY(-50%);
+    width: 30px;
+    height: 30px;
+    background-color: #007acc;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    z-index: 11;
+}
+/* 箭頭文字 - 加大字體 */
+#toggleArrow {
+    transition: transform 0.3s ease;
+    display: inline-block;
+    font-size: 26px;       /* 加大字體大小 */
+    font-weight: bold;
+    line-height: 1;        /* 確保垂直置中 */
+}
+/* 滑鼠懸停在箭頭上時稍微變亮，增加互動感 */
+.sidebar-toggle:hover {
+    background-color: #0098ff;
+}
+/* 展開時箭頭朝右 (原本)，收納時箭頭朝左 */
+.sidebar.collapsed #toggleArrow {
+    transform: rotate(180deg);
+}
+.sidebar button {
+    padding: 12px;
+    font-size: 14px;
+    cursor: pointer;
+    background-color: #007acc;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    transition: background-color 0.3s, transform 0.1s; /* 讓顏色變換平滑一點 */
+}
+.sidebar button:active {
+    transform: scale(0.98); /* 點擊時有壓下去的效果 */
+}
+.sidebar button:hover {
+    background-color: #0098ff;
+}
+button:disabled {
+    background-color: #ccc !important;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+/* ========================================= */
+/* Toast 通知訊息樣式 (取代 alert)          */
+/* ========================================= */
+#toast {
+    visibility: hidden; /* 預設隱藏 */
+    min-width: 250px;
+    margin-left: -125px; /* 為了置中 */
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    border-radius: 4px;
+    padding: 16px;
+    position: fixed;
+    z-index: 999;
+    left: 50%;
+    bottom: 30px;
+    font-size: 14px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    opacity: 0;
+    transition: opacity 0.5s, bottom 0.5s;
+}
+/* 顯示時的樣式 */
+#toast.show {
+    visibility: visible;
+    opacity: 1;
+    bottom: 50px; /* 稍微往上浮動的效果 */
+}
+/* 彈出視窗遮罩 */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+/* 視窗主體 */
+.modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    width: 80%;
+    max-height: 80%;
+    overflow: auto;
+    position: relative;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+}
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 15px;
+}
+.modal-header h3 { margin: 0; color: #333; }
+.close-btn {
+    background: none !important;
+    border: none !important;
+    color: #333 !important;
+    font-size: 28px !important;
+    padding: 0 !important;
+    cursor: pointer;
+}
+
+/* 狀態燈容器 */
+.status-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-left: 8px;
+    vertical-align: middle;
+    border: 1px solid rgba(0,0,0,0.2);
+    transition: background 0.3s ease;
+}
+
+/* 燈號顏色 */
+.led-orange { background: radial-gradient(circle at 4px 4px, #ffb347, #ff8c00); box-shadow: 0 0 5px #ff8c00; }
+.led-green  { background: radial-gradient(circle at 4px 4px, #a8ff78, #20e3b2); box-shadow: 0 0 5px #20e3b2; }
+.led-yellow { background: radial-gradient(circle at 4px 4px, #fff720, #ffcc00); box-shadow: 0 0 5px #ffcc00; }
+
+/* 閃爍動畫 */
+@keyframes blink {
+    0% { opacity: 1; }
+    50% { opacity: 0.3; }
+    100% { opacity: 1; }
+}
+
+.blink {
+    animation: blink 0.8s infinite;
+}
+
+.mermaid-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+

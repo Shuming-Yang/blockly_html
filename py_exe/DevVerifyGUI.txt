@@ -8,7 +8,7 @@ VSVersionInfo(
     # 設定檔案版本 (file version)
     filevers=(2026, 1, 2, 0),
     # 設定產品版本 (product version)
-    prodvers=(0, 0, 0, 0),
+    prodvers=(0, 0, 1, 2),
     # 設定有效位元的遮罩 (bitmask)。
     mask=0x3f,
     # 設定檔案的布林屬性 (Boolean attributes)。
@@ -43,7 +43,7 @@ VSVersionInfo(
           # 檔案描述。
           StringStruct('FileDescription', 'Device Verification Tool'),
           # 檔案版本
-          # StringStruct('FileVersion', '2026.01.02.00'),
+          # StringStruct('FileVersion', '2026.02.06.00'),
           # 應用程式的內部名稱。
           StringStruct('InternalName', 'Device Verification'),
           # 著作權資訊。
@@ -53,7 +53,7 @@ VSVersionInfo(
           #產品名稱。
           StringStruct('ProductName', 'Device Verification'),
           # 產品版, 此處會覆蓋掉prodvers的設定。
-          StringStruct('ProductVersion', '0.0.0.0')
+          StringStruct('ProductVersion', '0.0.1.2')
         ])
       ]), 
     # 定義一個 VarFileInfo 類別，用於描述可變的檔案資訊。

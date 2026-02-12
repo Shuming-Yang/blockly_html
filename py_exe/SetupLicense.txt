@@ -1,0 +1,5 @@
+DevVerifyGUI License Agreement
+
+Copyright (C) 2026 OmniVision Technologic, Inc.
+
+Permission is hereby granted, free of charge...

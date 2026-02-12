@@ -1,271 +1,1076 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Blockly VS Code Integration</title>
-
+    <script src="mermaid/mermaid.min.js"></script>
+    <script src="script/flowchart.js"></script>
     <script src="blockly/blockly.min.js"></script>
     <script src="blockly/python_compressed.js"></script>
     <script src="script/python_custom.js"></script>
     <script src="script/index.js"></script>
+    <script src="script/jsonout.js"></script>
     <script>
-    // ==========================================
-    //  取代 alert 的 Toast 通知函式
-    // ==========================================
-    function showToast(message) {
-        var x = document.getElementById("toast");
-        x.innerText = message; // 設定文字
-        x.className = "show";  // 顯示
-        
-        // 3秒後自動消失
-        setTimeout(function(){ 
-            x.className = x.className.replace("show", ""); 
-        }, 3000);
-    }
+        (function() {
+            // 儲存原始的 console.log (以便之後在瀏覽器 Debugger 還是能看到)
+            const originalLog = console.log;
 
-    // ==========================================
-    //  簡易深色模式切換
-    // ==========================================
-    function toggleDarkMode() {
-        document.body.classList.toggle('dark-theme');
-        
-        // 判斷目前是否為深色，給予提示
-        if (document.body.classList.contains('dark-theme')) {
-            showToast('已切換為深色模式 (介面)');
-            // 如果要更進階，這裡可以呼叫 Blockly 的 Theme API
-            // workspace.setTheme(Blockly.Themes.Dark); 
-        } else {
-            showToast('已切換為淺色模式');
-            // workspace.setTheme(Blockly.Themes.Classic);
-        }
-    }
+            console.log = function() {
+                // 1. 依然在瀏覽器終端機印出
+                originalLog.apply(console, arguments);
+
+                // 2. 將訊息傳給 Python (如果 pywebview 已經準備好了)
+                if (window.pywebview && window.pywebview.api && window.pywebview.api.js_log) {
+                    // 將所有參數轉成字串傳給 Python
+                    const args = Array.from(arguments).map(arg => 
+                        typeof arg === 'object' ? JSON.stringify(arg) : arg
+                    ).join(' ');
+                    
+                    window.pywebview.api.js_log(args);
+                }
+            };
+        })();
     </script>
-
-    <style>
-        /* ========================================= */
-        /* 全域設定 */
-        /* ========================================= */
-        body {
-            margin: 0;
-            height: 100vh;      /* 高度佔滿整個視窗 */
-            display: flex;      /* 啟用左右佈局 */
-            overflow: hidden;   /* 防止出現最外層捲軸 */
-            font-family: '微軟正黑體', sans-serif;
-            background-color: #fff;
-        }
-
-        /* ========================================= */
-        /* 左邊主畫面區域 (85%) - 放置 Blockly */
-        /* ========================================= */
-        .main-area {
-            flex: 8.5;           /* 佔 8.5/10 的寬度 */
-            display: flex;       /* 讓內部再做垂直切割 */
-            flex-direction: column; 
-            background-color: #fff;
-            position: relative;  
-            height: 100%;        
-            min-width: 0;        /* Flexbox 巢狀佈局的重要設定，防止溢出 */
-        }
-
-        /* Blockly 標題與控制列 */
-        .blockly-header {
-            padding: 10px;
-            background-color: #f0f0f0;
-            border-bottom: 1px solid #ccc;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            height: 50px;      
-            box-sizing: border-box; /* 確保 padding 不會撐大高度 */
-        }
-
-        .blockly-header h1 {
-            margin: 0;
-            font-size: 1.2rem;
-            color: #333;
-        }
-
-        /* Blockly 畫布容器 (最重要的部分) */
-        #blocklyDiv {
-            flex: 1;            /* 佔滿剩餘的所有高度 */
-            width: 100%;        
-            position: relative; /* 確保 Blockly 注入位置正確 */
-        }
-
-        /* 預覽輸出區塊 */
-        #outputPane {
-            display: none;      /* 預設隱藏 */
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            width: 400px;
-            height: 300px;
-            background: white;
-            border: 1px solid #ddd;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            z-index: 100;
-            padding: 10px;
-            flex-direction: column;
-            border-radius: 8px;
-        }
-        
-        #generatedCode {
-            flex: 1;
-            background-color: #f7f0e4;
-            margin: 0;
-            overflow: auto;
-            font-size: 13px;
-            padding: 10px;
-            border-radius: 4px;
-            white-space: pre-wrap; /* 自動換行 */
-        }
-
-        /* ========================================= */
-        /* 右邊側邊欄區域 (15%) */
-        /* ========================================= */
-        .sidebar {
-            flex: 1.5;          
-            background-color: #2d2d2d;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            box-shadow: -2px 0 5px rgba(0,0,0,0.2);
-            z-index: 10;   
-            min-width: 150px;   /* 防止側邊欄太窄 */
-        }
-
-        .sidebar button {
-            padding: 12px;
-            font-size: 14px;
-            cursor: pointer;
-            background-color: #007acc;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            transition: 0.2s;
-        }
-
-        .sidebar button:hover {
-            background-color: #0098ff;
-        }
-        
-        .btn-export {
-            background-color: #28a745 !important;
-        }
-        .btn-export:hover {
-            background-color: #34d058 !important;
-        }
-        /* ========================================= */
-        /* Toast 通知訊息樣式 (取代 alert)          */
-        /* ========================================= */
-        #toast {
-            visibility: hidden; /* 預設隱藏 */
-            min-width: 250px;
-            margin-left: -125px; /* 為了置中 */
-            background-color: #333;
-            color: #fff;
-            text-align: center;
-            border-radius: 4px;
-            padding: 16px;
-            position: fixed;
-            z-index: 999;
-            left: 50%;
-            bottom: 30px;
-            font-size: 14px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-            opacity: 0;
-            transition: opacity 0.5s, bottom 0.5s;
-        }
-
-        /* 顯示時的樣式 */
-        #toast.show {
-            visibility: visible;
-            opacity: 1;
-            bottom: 50px; /* 稍微往上浮動的效果 */
-        }
-
-        /* ========================================= */
-        /* 深色模式 (Dark Mode)                     */
-        /* ========================================= */
-        /* 當 body 加上 .dark-theme 時，改變變數或顏色 */
-        body.dark-theme {
-            background-color: #1e1e1e;
-            color: #ccc;
-        }
-        
-        /* 深色模式下的左側區域 */
-        body.dark-theme .main-area {
-            background-color: #1e1e1e;
-        }
-        
-        /* 深色模式下的標題列 */
-        body.dark-theme .blockly-header {
-            background-color: #252526;
-            border-bottom: 1px solid #3e3e3e;
-        }
-        
-        body.dark-theme .blockly-header h1 {
-            color: #fff;
-        }
-
-        /* 深色模式下的 Blockly 背景 (畫布本身通常由 Blockly API 控制，這裡改外框) */
-        body.dark-theme #blocklyDiv {
-            background-color: #1e1e1e; 
-        }
-    </style>
+  <link rel="stylesheet" href="index.css">
 </head>
 
 <body onload="initApp()">
 
     <div class="main-area">
         <div class="blockly-header">
-            <h1>積木程式編輯器</h1>
-            <div class="controls">
-                <span style="font-size:12px; color:#666;">Ready</span>
+            <div class="header-left">
+                <h1>Test Command - Code Editor on</h1>
+                <select id="boardSelect" onchange="handleBoardChange(this.value)">
+                    <option value="1" selected>MCU Board</option>
+                    <option value="2">ATB Board</option>
+                </select>
             </div>
         </div>
-
         <div id="blocklyDiv"></div>
+    </div>
 
-        <div id="outputPane">
-            <h4 style="margin-top:0; margin-bottom:5px;">Python 輸出預覽：</h4>
-            <pre id="generatedCode"><code></code></pre>
-            <button onclick="document.getElementById('outputPane').style.display='none'" style="margin-top:5px;">關閉</button>
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-toggle" onclick="toggleSidebar()">
+            <span id="toggleArrow">❯</span>
+        </div>
+        <div class="sidebar-group">
+            <div class="group-title">File Operations</div>
+            <input type="file" id="fileInput" style="display: none;" accept=".json" onchange="handleFileSelect(event)">
+            <button id="cleanBtn" onclick="cleanTestCase()">Clean Workspace</button>
+            <button id="loadBtn" onclick="loadTestCase()">Load Workspace</button>
+            <button id="saveBtn" onclick="saveTestCase()">Save Workspace</button>
+        </div>
+        <div class="sidebar-group" id="execution-group">
+            <div class="group-title">
+                Execution <span id="statusLed" class="status-indicator led-orange"></span>
+            </div>
+            <button id="scanBoardButton" onclick="scanTestBoard()">Scan Test Board</button>
+            <button id="testToggleButton" onclick="toggleTestProcess()" disabled style="display: none;">
+                Loading...
+            </button>
+            <button id="scriptTestButton" onclick="scriptTest()">Script Test</button>
+        </div>
+        <div class="sidebar-group" id="advanced-group">
+            <div class="group-title">Advanced</div>
+            <button id="previewBtn" onclick="previewFlowchart()" style="display: none;">
+                Preview Flowchart
+            </button>
+            <button id="generatePathButton" onclick="generateDataPath()" style="display: none;">
+                Generate DataPath
+            </button>
+            <button id="atbConfigButton" onclick="openAtbConfig()" style="display: none;">
+                ATB Board Cfg
+            </button>
+            <button onclick="exportBlockDefinitions()">
+                導出積木定義 (JSON)<br>Debug ONLY
+            </button>
+        </div>
+        <div class="sidebar-group" style="margin-top: auto; border-top: 1px solid #444; padding-top: 10px;">
+            <button id="aboutBtn" onclick="document.getElementById('aboutModal').style.display='flex'" 
+                    style="background-color: #5bc0de; color: white;">
+                About
+            </button>
         </div>
     </div>
 
-    <div class="sidebar">
-        <button id="saveButton" class="btn-export" onclick="exportPython()">輸出 Python 程式碼</button>
-        
-        <hr style="border: 0.5px solid #555; width: 100%;">
-        
-        <button onclick="toggleDarkMode()">切換深色/淺色模式</button>
-        <button onclick="showToast('功能開發中，敬請期待！')">其他功能</button>
+    <div id="toast">Message Notice</div>
+    <div id="mermaidModal" class="modal-overlay" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Flowchart Preview</h3>
+                <button class="close-btn" onclick="document.getElementById('mermaidModal').style.display='none'">×</button>
+            </div>
+            <div class="mermaid-container"></div>
+        </div>
     </div>
-
-    <div id="toast">訊息提示</div>
-
+    <div id="aboutModal" class="modal-overlay" style="display:none;">
+        <div class="modal-content" style="max-width: 500px; text-align: left;">
+            <div class="modal-header">
+                <h3>About Application</h3>
+                <button class="close-btn" onclick="document.getElementById('aboutModal').style.display='none'">×</button>
+            </div>
+            <div style="padding: 15px; font-size: 14px; color: #333; line-height: 1.6;">
+                <p><strong>Product: Device Verification</strong></p>
+                <p>Description: Device Verification Tool</p>
+                <p>File Version: 2026.01.02.00</p>
+                <p>Copyright © 2026 OmniVision Technologic, Inc.</p>
+                <p>All Rights Reserved.</p>
+                <hr style="margin: 15px 0; border: 0; border-top: 1px solid #eee;">
+                <p><strong>Open Source Licenses</strong></p>
+                <p>This application incorporates software from the following projects:</p>
+                <div style="background: #f8f8f8; padding: 10px; border-radius: 4px; font-size: 12px; border: 1px solid #ddd; margin-bottom: 10px;">
+                    <p><strong>Google Blockly</strong></p>
+                    <p>Copyright © 2026 Google LLC</p>
+                    <p>Licensed under the <a href="http://www.apache.org/licenses/LICENSE-2.0" target="_blank" style="color: #0275d8; text-decoration: none;">Apache License, Version 2.0</a></p>
+                </div>
+                <!-- <div style="background: #f8f8f8; padding: 10px; border-radius: 4px; font-size: 12px; border: 1px solid #ddd;">
+                    <p><strong>Mermaid.js</strong></p>
+                    <p>Licensed under the MIT License.</p>
+                </div> -->
+            </div>
+            <div style="text-align: right; padding: 10px; border-top: 1px solid #eee;">
+                <button onclick="document.getElementById('aboutModal').style.display='none'" 
+                        style="padding: 6px 20px; border-radius: 4px; border: 1px solid #ccc; cursor: pointer; background: #fff;">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
     <script>
+        // ==========================================
+        //  全域變數設定
+        // ==========================================
+        const BASE_TITLE = "Device Verification Tool";
+        const FILENAME_DEFAULT = "testcase.json"; // 定值
+        let filenameCurrent = FILENAME_DEFAULT;   // 隨狀態改變
+        let isModified = false; // 用來追蹤工作區是否被更動過
+        var GLOBAL_BOARD_ID = 1; // 預設為 1 (MCU Board), 2 為 ATB Board
+        // 狀態追蹤變數
+        let isTesting = false;
+        let isSimulationMode = false; // [Added] Simulation mode flag
+        let isDebugMode = false; // [Added] Debug mode flag, default to false
+        // 輔助用的延遲函數
+        const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        // ==========================================
+        //  取代 alert 的 Toast 通知函式
+        // ==========================================
+        function showToast(message) {
+            var x = document.getElementById("toast");
+            x.innerText = message; // 設定文字
+            x.className = "show";  // 顯示
+            // 3秒後自動消失
+            setTimeout(function(){ 
+                x.className = x.className.replace("show", ""); 
+            }, 3000);
+        }
+
+        // ==========================================
+        //  根據 isDebugMode 更新 UI 元素的可見性
+        // ==========================================
+        function updateDebugUI() {
+            const executionGroup = document.getElementById('execution-group');
+            const advancedGroup = document.getElementById('advanced-group');
+            const displayStyle = isDebugMode ? 'flex' : 'none';
+
+            if (executionGroup) executionGroup.style.display = displayStyle;
+            if (advancedGroup) advancedGroup.style.display = displayStyle;
+
+            console.log(`Debug UI visibility updated. Debug Mode is ${isDebugMode ? 'ON' : 'OFF'}.`);
+        }
+
+        // ==========================================
+        // 統一更新網頁標題與頁面標題列
+        // @param {string} fileName - 檔案名稱 (例如: testcase.json)
+        // ==========================================
+        async function updateAppTitle(fileName, modifiedStatus = false) {
+            // 更新 pywebview 視窗外框標題 (透過 Python API)
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.set_app_title) {
+                const nameToDisplay = fileName || FILENAME_DEFAULT;
+                // 檔名前方加上 * 代表未儲存
+                const displayTag = modifiedStatus ? `*${filenameCurrent}` : filenameCurrent;
+                await window.pywebview.api.set_app_title(file_name=displayTag, base_title=BASE_TITLE);
+            }
+        }
+
+        // ==========================================
+        //  板子切換邏輯
+        // ==========================================
+        function handleBoardChange(arg) {
+            // 1. 取得原始值 (容錯處理)
+            // 如果傳進來的是 HTML 元素 (有 .value 屬性)，就取 .value
+            // 如果傳進來的是直接的值 (字串或數字)，就直接用
+            let rawValue = (arg && arg.value !== undefined) ? arg.value : arg;
+
+            // 2. 轉成整數 (十進位)
+            const targetValue = parseInt(rawValue, 10);
+            // 檢查轉換結果，如果是 NaN 代表出錯了
+            if (isNaN(targetValue)) {
+                console.error("Board ID 解析失敗，原始值為:", arg);
+                return;
+            }
+            // 3. 直接切換，不再強制清空畫布 (由 index.js 的 validateBlocksOnWorkspace 處理相容性)
+            performSwitch(targetValue);
+        }
+
+        // ==========================================
+        //  UI 連動：根據板子類型 ATB顯示按鈕/非ATB隱藏按鈕 並在切換回非 ATB 模式時，自動關閉視窗
+        // ==========================================
+        async function updateBtnVisibility(boardId) {
+            const genPathBtn = document.getElementById('generatePathButton');
+            const atbCfgBtn = document.getElementById('atbConfigButton');
+            const isATB = (parseInt(boardId, 10) === 2); // 2 = ATB
+            // 1. 按鈕顯示控制
+            if (isATB) {
+                if (genPathBtn) genPathBtn.style.display = 'block';
+                // Set to be disable display always for atbCfgBtn because it is the low priority to-do task
+                // if (atbCfgBtn) atbCfgBtn.style.display = 'block';
+            } else {
+                if (genPathBtn) genPathBtn.style.display = 'none';
+                if (atbCfgBtn) atbCfgBtn.style.display = 'none';
+            }
+            // 2. [新增] 視窗關閉邏輯
+            // 如果切換後的模式 "不是" ATB，且後端 API 存在，則嘗試關閉 GENS 視窗
+            if (!isATB) {
+                if (window.pywebview && window.pywebview.api) {
+                    try {
+                        // 不論視窗有沒有開，呼叫關閉都是安全的 (後端會處理)
+                        await window.pywebview.api.close_gens_window();
+                        await window.pywebview.api.close_atb_config_window();
+                    } catch (e) {
+                        console.error("Failed to close window:", e);
+                    }
+                }
+            }
+        }
+
+        // 實際執行變數更新與 Log 的函式
+        async function performSwitch(newValue) {
+            GLOBAL_BOARD_ID = newValue;
+            const isValid = update_toolbox(GLOBAL_BOARD_ID);
+            if (!isValid) {
+                alert("Warning: Some blocks in the workspace are not compatible with the selected board.");
+            }
+            // 同步更新按鈕顯示狀態
+            updateBtnVisibility(GLOBAL_BOARD_ID);
+        }
+
+        async function scriptTest() {
+            if (window.pywebview && window.pywebview.api) {
+                await window.pywebview.api.script_test_sendfile();
+            }
+            showToast("Script Test End.");
+        }
+
+        async function scanTestBoard() {
+            // Check for invalid blocks before scanning
+            if (typeof validateBlocksOnWorkspace === 'function') {
+                if (!validateBlocksOnWorkspace()) {
+                    alert("Warning: Invalid blocks detected.\nPlease resolve them before scanning.");
+                    return;
+                }
+            }
+            isSimulationMode = false; // [Added] Reset simulation mode on real scan
+            const btn = document.getElementById('scanBoardButton') || event.target;
+            if (!btn) return;
+            btn.disabled = true;
+            btn.innerText = 'Scanning...';
+            updateStatusLed('orange', true); // 閃爍橘燈
+            showToast("Scanning for board...");
+            console.log("Start scanning...");
+            // 呼叫 Python 邏輯
+            if (window.pywebview && window.pywebview.api) {
+                try {
+                    // 呼叫後端掃描
+                    await window.pywebview.api.scan_board();
+                    // 執行完後不要把 disabled 改回 false。要等待 Python 透過 handleBackendEvent 回傳 'SCAN_FINISHED' 後再由 handleBackendEvent 決定是要「隱藏按鈕」還是「恢復按鈕」。
+                } catch (error) {
+                    console.error("Scan call failed:", error);
+                    showToast("Failed to start scan.");
+                    // 只有在「呼叫失敗」的情況下 (例如 Python 報錯)，才需要在這裡馬上恢復按鈕，避免按鈕卡死在 Scanning 狀態
+                    btn.disabled = false;
+                    btn.innerText = 'Scan Test Board';
+                }
+            } else {
+                // [Browser Mode] 純瀏覽器測試用 (模擬 1 秒後收到結果)
+                setTimeout(() => {
+                    // 假設模擬掃描到了正確的板子
+                    if (window.handleBackendEvent) {
+                        // 這裡帶入 GLOBAL_BOARD_ID 模擬比對成功
+                        window.handleBackendEvent('SCAN_FINISHED', GLOBAL_BOARD_ID);
+                    }
+                }, 1000);
+            }
+        }
+
+        /**
+         * 更新狀態燈號
+         * @param {string} color - 'orange', 'green', 'yellow'
+         * @param {boolean} isBlinking - 是否閃爍
+         */
+        function updateStatusLed(color, isBlinking = false) {
+            const led = document.getElementById('statusLed');
+            if (!led) return;
+            // 先移除所有狀態類名
+            led.className = 'status-indicator';
+            // 加入顏色類名
+            led.classList.add(`led-${color}`);
+            // 加入閃爍類名
+            if (isBlinking) {
+                led.classList.add('blink');
+            }
+        }
+
+        // ==========================================
+        //  啟動測試程式
+        // ==========================================
+        /**
+         * 產生 IR 資料 (獨立函式以供重複使用)
+         */
+        async function generateIR() {
+            let flattenedWorkspace = null;
+            let irData = null;
+                        try {
+                if (typeof flattenWorkspace === 'function') {
+                    flattenedWorkspace = flattenWorkspace();
+                    try {
+                        irData = IR_generator(flattenedWorkspace);
+                    } catch (e) {
+                        console.error("JSON_OUT generation failed:", e);
+                        showToast("Warning: JSON_OUT generation failed.");
+                    }
+                }
+            } catch (e) {
+                console.error("Flattening failed:", e);
+                showToast("Warning: Flattening failed, saving project only.");
+            }
+            return { flattenedWorkspace, irData };
+        }
+        async function toggleTestProcess() {
+            const btn = document.getElementById('testToggleButton') || event.target;
+            const loadBtn = document.getElementById('loadBtn');
+            const cleanBtn = document.getElementById('cleanBtn');
+            // 進入測試邏輯
+            if (!isTesting) {
+                if (!workspace) {
+                    showToast("Workspace is not ready!");
+                    return;
+                }
+                if (loadBtn) loadBtn.disabled = true;
+                if (cleanBtn) cleanBtn.disabled = true;
+                btn.innerText = 'Processing...';
+                updateStatusLed('yellow', true); // 閃爍黃燈
+                const workspaceState = Blockly.serialization.workspaces.save(workspace);
+                const blockly_customer = return_dynamic_block();
+
+                // [Added] 取得扁平化後的指令集
+                const { flattenedWorkspace, irData } = await generateIR();
+
+                // 組合自定義的資料結構
+                const finalState = {
+                    // 在最前面插入 GUI 相關設定
+                    gui: {
+                        GLOBAL_BOARD_ID: GLOBAL_BOARD_ID,
+                        is_simulation: isSimulationMode
+                    },
+                    customer_blockly:{
+                        ...blockly_customer
+                    },
+                    // 將 Blockly 的原始資料展開接在後面
+                    ...workspaceState,
+                    // 若有扁平化資料，也一併帶入 (通常執行測試需要 IR)
+                    ir_data: irData || {}
+                };
+                isTesting = true;
+                btn.innerText = 'Abort Test';
+                btn.style.backgroundColor = '#d9534f'; 
+                showToast('Starting execution...');
+                if (window.pywebview && window.pywebview.api) {
+                    window.pywebview.api.start_test_process(finalState);
+                }
+            } 
+            // 中止/停止測試邏輯
+            else {
+                btn.innerText = 'Processing...';
+                btn.style.backgroundColor = '#f0ad4e'; // 變成橘色，提示正在處理中
+                btn.disabled = true; // 處理期間禁用按鈕，防止重複點擊
+                if (window.pywebview && window.pywebview.api) {
+                    window.pywebview.api.stop_test_process();
+                }
+            }
+        }
+
+        // ==========================================
+        //  產生 ATB Board Configure 邏輯
+        // ==========================================
+        function openAtbConfig() {
+            showToast('Opening ATB Board Configuration...');
+            console.log("Requesting ATB Config window...");
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.open_atb_config_window) {
+                window.pywebview.api.open_atb_config_window();
+            } else {
+                console.warn("Python API 'open_atb_config_window' not implemented yet.");
+            }
+        }
+        // ==========================================
+        //  產生 DataPath 邏輯
+        // ==========================================
+        async function generateDataPath() {
+            showToast('Initializing GENS Application...');
+            console.log("Requesting GENS window...");
+            if (window.pywebview && window.pywebview.api) {
+                // 呼叫 api_bridge.py 定義的接口
+                try {
+                    const result = await window.pywebview.api.open_gens_window();
+                    console.log("GENS Status:", result);
+                } catch (error) {
+                    showToast("Failed to open GENS");
+                    console.error(error);
+                }
+            } else {
+                showToast("Browser mode: GENS is not available.");
+            }
+        }
+
+        // ==========================================
+        //  TestCase 檔案操作 (JSON 序列化)
+        // ==========================================
+
+        // 儲存：按鈕點擊事件
+        async function saveTestCase() {
+            try {
+                if (!workspace) throw new Error("Workspace is not initialized.");
+
+                // 0. Validate blocks before saving
+                if (typeof validateBlocksOnWorkspace === 'function') {
+                    if (!validateBlocksOnWorkspace()) {
+                        if (!confirm("Warning: Invalid blocks detected.\nDo you want to continue saving?")) {
+                            return;
+                        }
+                    }
+                }
+
+                // 3. 定義存檔輔助函式
+                const saveFile = async (content, defaultName, description, forceDialog = false) => {
+                    let finalContent;
+                    let mimeType;
+                    let extension;
+                    if (defaultName.toLowerCase().endsWith('.json')) {
+                        // 如果是 JSON，進行字串化
+                        finalContent = JSON.stringify(content, null, 2);
+                        mimeType = 'application/json';
+                        extension = '.json';
+                    } else {
+                        // 如果是 TXT 或其他，直接合併陣列（假設 content 是陣列）
+                        finalContent = Array.isArray(content) ? content.join('\n') : content;
+                        mimeType = 'text/plain';
+                        extension = '.txt';
+                    }
+
+                    // 如果後端 API 存在，則一律使用後端處理存檔，不 Fallback 到瀏覽器下載
+                    if (window.pywebview && window.pywebview.api) {
+                        if (window.pywebview.api.save_file) {
+                            try {
+                                let savedPath = null;
+                                const filenameOnly = defaultName.split(/[/\\]/).pop();
+
+                                if (forceDialog) {
+                                    // 狀況 B: 開啟存檔對話框 (用於主專案檔)
+                                    // 布林值 `false` 告訴後端要開啟對話框
+                                    savedPath = await window.pywebview.api.save_file(filenameOnly, finalContent, false);
+                                } else {
+                                    // 狀況 A: 直接存檔，不跳對話框 (用於附屬檔案)
+                                    // 布林值 `true` 告訴後端直接存到專案目錄
+                                    savedPath = await window.pywebview.api.save_file(filenameOnly, finalContent, true);
+                                }
+
+                                if (savedPath === null && !forceDialog) {
+                                    // 只有在直接存檔失敗時才提示，使用者取消對話框不算錯誤
+                                    throw new Error(`Backend error: Could not save ${description}`);
+                                }
+                                return savedPath;
+
+                            } catch (e) {
+                                throw new Error(`Backend save failed for ${description}: ${e.message || e}`);
+                            }
+                        }
+                    }
+
+                    // --- Fallback 邏輯: 只有在沒有 pywebview 環境時才會執行 ---
+                    console.log(`Backend not found. Falling back to browser download for ${description}.`);
+                    const blob = new Blob([finalContent], { type: mimeType });
+                    try {
+                        if (window.showSaveFilePicker) {
+                            const handle = await window.showSaveFilePicker({
+                                suggestedName: defaultName.endsWith(extension) ? defaultName : defaultName + extension,
+                                types: [{
+                                    description: description || `${extension.toUpperCase()} File`,
+                                    accept: { [mimeType]: [extension] }, // 動態設定 accept
+                                }],
+                            });
+                            const writable = await handle.createWritable();
+                            await writable.write(blob);
+                            await writable.close();
+                            return handle.name;
+                        } else {
+                            const a = document.createElement('a');
+                            a.href = URL.createObjectURL(blob);
+                            a.download = defaultName;
+                            a.click();
+                            return defaultName;
+                        }
+                    } catch (err) {
+                        if (err.name !== 'AbortError') {
+                            throw new Error(`Error saving ${description}: ${err.message || err}`);
+                        }
+                        return null;
+                    }
+                };
+
+                // 1. 取得原本的 Blockly 狀態 (裡面包含 blocks, variables 等)
+                const blocklyState = Blockly.serialization.workspaces.save(workspace);
+                const blockly_customer = return_dynamic_block();
+
+                // 2. 組合自定義的資料結構 (Project File)
+                const projectState = {
+                    // 在最前面插入 GUI 相關設定
+                    gui: {
+                        GLOBAL_BOARD_ID: GLOBAL_BOARD_ID
+                    },
+                    customer_blockly:{
+                        ...blockly_customer
+                    },
+                    // 將 Blockly 的原始資料展開接在後面
+                    ...blocklyState
+                };
+
+                // 3. 執行存檔流程
+                // (A) 存 Project File
+                const savedProjectName = await saveFile(projectState, filenameCurrent, 'Project File', true);
+                if (!savedProjectName) {
+                    return; // User cancelled
+                }
+
+                // 更新全域檔名與標題
+                filenameCurrent = savedProjectName;
+                await updateAppTitle(filenameCurrent, false);
+
+                // (B) 計算 Normalize 檔名
+                let normalizeName = savedProjectName;
+                let IRname = savedProjectName;
+                let Parsetxtname = savedProjectName;
+                if (normalizeName.toLowerCase().endsWith('.json')) {
+                    let pjt_name = normalizeName.slice(0, -5);
+                    normalizeName = pjt_name + '_normalize.json';
+                    IRname = pjt_name + '_IR.json';
+                    Parsetxtname = pjt_name + '_parse_mcu.txt';
+                } else {
+                    normalizeName += '_normalize.json';
+                    IRname += '_IR.json';
+                    Parsetxtname += '_parse_mcu.txt';
+                }
+
+                // [Added] 取得扁平化後的指令集
+                const { flattenedWorkspace, irData } = await generateIR();
+
+                if (!flattenedWorkspace || !irData) {
+                    throw new Error("Failed to generate IR data or flattened workspace.");
+                }
+
+                if (isDebugMode) {
+                    // (C) 存 Normalize File and IR File
+                    const normalizeState = {
+                        gui: {
+                            GLOBAL_BOARD_ID: GLOBAL_BOARD_ID
+                        },
+                        customer_blockly:{
+                            ...blockly_customer
+                        },
+                        ...flattenedWorkspace
+                    };
+                    await saveFile(normalizeState, normalizeName, 'Normalize File');
+
+                    await saveFile(irData, IRname, 'IR name');
+                }
+
+                //  Parse IR file to MCU TXT
+                if (window.pywebview && window.pywebview.api && window.pywebview.api.Parse_MCU_txt) {
+                    try {
+                        let mcu_parse_object = await window.pywebview.api.Parse_MCU_txt(irData);
+                        await saveFile(mcu_parse_object, Parsetxtname, 'parse name');
+                    } catch (e) {
+                        throw new Error(`Parse_MCU_txt failed: ${e.message || e}`);
+                    }
+                }
+
+                if (!isDebugMode) {
+                    // 如果不是除錯模式，顯示訊息
+                    showToast("Project saved successfully!");
+                    return;
+                }else{
+                    showToast("Project and debug files saved successfully!");
+                }
+            } catch (error) {
+                console.error("saveTestCase Error:", error);
+                showToast(error.message);
+            }
+        }
+
+        /**
+         * 將執行區域的 UI 重置回初始的 Scan 狀態
+         */
+        function resetExecutionUI() {
+            const scanBtn = document.getElementById('scanBoardButton');
+            const testBtn = document.getElementById('testToggleButton');
+            const boardSelect = document.getElementById('boardSelect');
+
+            // 1. 顯示 Scan 按鈕，隱藏 Test 按鈕
+            if (scanBtn) {
+                scanBtn.style.display = 'block';
+                scanBtn.disabled = false;
+                scanBtn.innerText = 'Scan Test Board';
+            }
+            if (testBtn) {
+                testBtn.style.display = 'none';
+                testBtn.disabled = false; // 確保下次顯示時是啟用的
+            }
+
+            // 2. 解鎖板子選擇下拉選單
+            if (boardSelect) {
+                boardSelect.disabled = false;
+            }
+
+            // 3. 重置燈號為 IDLE (橘燈)
+            updateStatusLed('orange', false);
+        }
+
+        // 清除：按鈕點擊事件
+        function cleanTestCase() {
+            // 1. 停止事件觸發
+            Blockly.Events.disable();
+            workspace.clear();
+            // 2. 恢復事件觸發
+            Blockly.Events.enable();
+            // 3. 手動重置標題
+            filenameCurrent = FILENAME_DEFAULT;
+            isModified = false;
+            updateAppTitle(filenameCurrent, false);
+            resetExecutionUI();
+            showToast("TestCase cleaned.");
+        }
+
+        // 載入：按鈕點擊事件
+        async function loadTestCase() {
+            // 1. 優先嘗試透過 Python 後端開啟檔案 Dialog
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.load_test_case_dialog) {
+                try {
+                    const result = await window.pywebview.api.load_test_case_dialog();
+                    if (result) {
+                        // 成功從後端讀取
+                        processLoadedContent(result.content, result.filename);
+                        return;
+                    } else {
+                        // 使用者取消或未選擇，直接返回，不觸發前端 Fallback
+                        return;
+                    }
+                } catch (e) {
+                    console.warn("Backend load failed, falling back to frontend:", e);
+                }
+            }
+            // 2. Fallback: 觸發隱藏的 input
+            console.log("Triggering frontend file input...");
+            document.getElementById('fileInput').click();
+        }
+
+        // 統一處理讀取到的檔案內容 (JSON)
+        async function processLoadedContent(content, filename) {
+            try {
+                const state = JSON.parse(content);
+                // =========================================
+                // [新增] 1. 優先還原 GUI 設定 (Board ID)
+                // =========================================
+                if (state.gui && state.gui.GLOBAL_BOARD_ID !== undefined) {
+                    // 更新全域變數
+                    GLOBAL_BOARD_ID = state.gui.GLOBAL_BOARD_ID;
+                    // 更新 UI 下拉選單 (轉成字串以匹配 value)
+                    const select = document.getElementById('boardSelect');
+                    const scanBtn = document.getElementById('scanBoardButton');
+                    const testBtn = document.getElementById('testToggleButton');
+                    if (select) {
+                        select.value = String(GLOBAL_BOARD_ID);
+                    }
+                    if (scanBtn) {
+                        scanBtn.style.display = 'block';
+                        scanBtn.disabled = false;
+                        scanBtn.innerText = 'Scan Test Board';
+                    }
+                    if (testBtn) {
+                        testBtn.style.display = 'none';
+                    }
+                    // 重置燈號為 IDLE (橘燈)
+                    updateStatusLed('orange', false);
+                    // 讀檔後也要同步更新按鈕顯示狀態
+                    updateBtnVisibility(GLOBAL_BOARD_ID);
+                    console.log("Restored Board ID from file:", GLOBAL_BOARD_ID);
+                }
+                // =========================================
+                // 2. 還原 Blockly 積木
+                // =========================================
+                // 停止事件觸發
+                Blockly.Events.disable();
+                workspace.clear();
+                update_toolbox(GLOBAL_BOARD_ID);
+                if (state.customer_blockly) {
+                    update_dynamic_toolbox(state.customer_blockly)
+                }
+                // Blockly 很聰明，它讀取 state 時會自動忽略看不懂的 key (例如 'gui')
+                // 所以直接把整個 state 丟給它也沒問題
+                Blockly.serialization.workspaces.load(state, workspace);
+                workspace.scrollCenter();
+                // 恢復事件觸發
+                Blockly.Events.enable();
+
+                // [新增] 讀檔後檢查相容性
+                if (typeof validateBlocksOnWorkspace === 'function') {
+                    if (!validateBlocksOnWorkspace()) {
+                        if (!confirm("Warning: The loaded project contains blocks incompatible with the current board.\nDo you want to keep the loaded project?")) {
+                            cleanTestCase(); // 使用者選擇不保留，則清空
+                            return;
+                        }
+                    }
+                }
+
+                filenameCurrent = filename;
+                updateAppTitle(filename, false);
+                showToast("TestCase Loaded Successfully!");
+            } catch (err) {
+                console.error("JSON Parsing Error:", err);
+                showToast("Error: Invalid TestCase format.");
+            }
+        }
+
+        // 當使用者選好檔案後的處理邏輯
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                console.log("No file selected.");
+                return;
+            }
+            const reader = new FileReader();
+            // 讀取成功後的處理
+            reader.onload = function(e) {
+                const content = e.target.result;
+                processLoadedContent(content, file.name);
+                event.target.value = '';
+            };
+            // 開始以文字格式讀取檔案
+            reader.readAsText(file);
+        }
+
+        // ==========================================
+        //  右側 Sidebar 邏輯
+        // ==========================================
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('collapsed');
+            // 側邊欄寬度改變後，Blockly 需要重新計算畫布大小
+            setTimeout(() => {
+                if (typeof workspace !== 'undefined' && workspace) {
+                    window.dispatchEvent(new Event('resize'));
+                }
+            }, 310); // 略長於 CSS 的 0.3s 動畫時間
+        }
+
+        // 初始化 Mermaid
+        mermaid.initialize({ 
+            startOnLoad: false, 
+            theme: 'default',
+            securityLevel: 'loose' 
+        });
+
+        /**
+         * 點擊預覽流程圖的函式
+         */
+        async function previewFlowchart() {
+            if (!workspace) return;
+            const code = FlowchartConverter.convertToMermaid(workspace);
+            const container = document.querySelector('.mermaid-container');
+            // 顯示視窗
+            document.getElementById('mermaidModal').style.display = 'flex';
+            // 清除舊圖表
+            container.innerHTML = code;
+            container.removeAttribute('data-processed');
+            // 渲染新圖表
+            await mermaid.run({
+                nodes: [container]
+            });
+        }
+        // 監聽專用的 ready 事件
+        window.addEventListener('pywebviewready', function() {
+            console.log("PyWebview is ready!");
+            showToast("PyWebview is ready!");
+            // 現在才開始檢查狀態 (才能夠透過pywebview去呼叫帶入的python API)
+            // 增加到 500ms，確保視窗完全穩定
+            setTimeout(() => {
+                updateAppTitle(filenameCurrent, false)
+                // 將監聽器掛載到全域的 workspace 物件上
+                if (typeof workspace !== 'undefined') {
+                    attachBlocklyChangeListener(workspace);
+                }
+            }, 500);
+        });
+        // 監聽使用者按下F5功能鍵事件
+        window.addEventListener('keydown', function (e) {
+            // 攔截 F5 (116)
+            if (e.keyCode === 116 ) {
+                e.preventDefault(); // 攔截前端刷新導致後端不同步
+                if(e.ctrlKey){
+                    isDebugMode = !isDebugMode;
+                    const status = isDebugMode ? "ON" : "OFF";
+                    showToast(`Debug Mode: ${status}`);
+                    updateDebugUI(); // 呼叫函式來更新 UI
+                }
+            }else if (e.ctrlKey && e.keyCode === 82) {
+                // 攔截 Ctrl+R (82)
+                e.preventDefault(); // 攔截前端刷新導致後端不同步
+            }
+            // 攔截 F12: 模擬「掃描成功」當前下拉選單指定的板子
+            else if (e.keyCode === 123) {
+                // 取得 Scan 按鈕，用來判斷目前是否處於「可掃描模式」
+                const scanBtn = document.getElementById('scanBoardButton');
+                const isScanMode = scanBtn && (window.getComputedStyle(scanBtn).display !== 'none');
+                // 限制：只有在 Scan 按鈕還看得到的時候，F12 才有效
+                if (isScanMode) {
+                    e.preventDefault(); // 攔截預設的開發者工具
+                    isSimulationMode = true; // [Added] Set simulation mode
+                    // 取得當前 UI 上選擇的板子 ID
+                    const targetId = parseInt(GLOBAL_BOARD_ID, 10);
+                    const boardName = (targetId === 1) ? "MCU" : "ATB";
+                    console.log(`[Simulation] F12 Pressed. Simulating success for: ${boardName} (ID: ${targetId})`);
+                    // 視覺回饋
+                    scanBtn.disabled = true;
+                    scanBtn.innerText = `Simulating ${boardName}...`;
+                    // 模擬後端回傳成功事件
+                    setTimeout(() => {
+                        if (window.handleBackendEvent) {
+                            // 關鍵：直接帶入目前的 GLOBAL_BOARD_ID，確保 100% Match
+                            window.handleBackendEvent('SCAN_FINISHED', targetId);
+                        }
+                    }, 300);
+                } else {
+                    // 板子已鎖定，F12 不做任何事
+                    console.log("[Simulation] Board already locked. F12 disabled.");
+                }
+            }
+        });
+        /**
+         * 設置 Blockly 變更監聽
+         */
+        function attachBlocklyChangeListener(workspace) {
+            workspace.addChangeListener(function(event) {
+                // 我們只在意會改變程式邏輯的事件 (排除 UI 點擊、選取、滾動等)
+                const DATA_CHANGES = [
+                    Blockly.Events.BLOCK_CREATE,
+                    Blockly.Events.BLOCK_DELETE,
+                    Blockly.Events.BLOCK_CHANGE,
+                    Blockly.Events.BLOCK_MOVE
+                ];
+                if (DATA_CHANGES.includes(event.type) && !event.isUiEvent) {
+                    // 如果目前還沒標記為「已修改」，且工作區真的有東西
+                    if (!isModified) {
+                        console.log("Workspace changed, adding '*' mark.");
+                        updateAppTitle(filenameCurrent, true); 
+                    }
+                }
+            });
+        }
+
+        // 讓 Python 通知前端「事件觸發了」（例如：硬體斷線、測試完成、或是收到特定的數據）
+        window.handleBackendEvent = async function(eventName, data) {
+            if (eventName === 'TEST_FINISHED') {
+                showToast("Test Process Completed.");
+                const testBtn = document.getElementById('testToggleButton');
+                const loadBtn = document.getElementById('loadBtn');
+                const cleanBtn = document.getElementById('cleanBtn');
+                if (testBtn) {
+                    testBtn.innerText = 'Start Test'
+                    testBtn.style.backgroundColor = ''; // 恢復預設（通常是 CSS 定義的藍色）
+                }
+                testBtn.disabled = false; // 重新啟用按鈕
+                if (loadBtn) loadBtn.disabled = false; // 恢復啟用狀態
+                if (cleanBtn) cleanBtn.disabled = false; // 恢復啟用狀態
+                updateStatusLed('green', false); // 返回恆亮綠燈
+                isTesting = false;
+            }
+            else if (eventName === 'SCAN_FINISHED') {
+                // 取得相關按鈕 DOM
+                const scanBtn = document.getElementById('scanBoardButton');
+                const testBtn = document.getElementById('testToggleButton');
+                const boardSelect = document.getElementById('boardSelect');
+                // 確保數據型別一致 (轉成整數比較最安全)
+                const detectedId = parseInt(data, 10);
+                const currentGlobalId = parseInt(GLOBAL_BOARD_ID, 10);
+                console.log(`Scan Result: Detected=${detectedId}, Expected=${currentGlobalId}`);
+                // 判斷邏輯：值相同 且 不是 0 (假設 0 代表未偵測到)
+                if (detectedId === currentGlobalId && detectedId !== 0) {
+                    // ===========================
+                    //  狀況 A: 比對成功 (Match)
+                    // ===========================
+                    updateStatusLed('green', false); // 恆亮綠燈
+                    // 1. 隱藏 Scan 按鈕
+                    if (scanBtn) {
+                        scanBtn.style.display = 'none';
+                        scanBtn.disabled = false; // 恢復啟用狀態，以備下次顯示時正常
+                        scanBtn.innerText = 'Scan Test Board'; // 文字重置
+                    }
+                    // 2. 鎖定 boardSelect 選單
+                    if (boardSelect) {
+                        boardSelect.disabled = true;
+                    }
+                    // 3. 顯示並初始化 Test 按鈕
+                    if (testBtn) {
+                        // 先向後端確認目前的執行狀態 (加 await)
+                        try {
+                            const isRunning = await window.pywebview.api.is_test_running();
+                            if (isRunning) {
+                                testBtn.innerText = 'Abort Test';
+                                testBtn.style.backgroundColor = '#d9534f'; // 紅色
+                            } else {
+                                testBtn.innerText = 'Start Test';
+                                testBtn.style.backgroundColor = ''; // 恢復預設（通常是 CSS 定義的藍色）
+                            }
+                            testBtn.style.display = 'block';
+                            testBtn.disabled = false; // 重新啟用按鈕
+                        } catch (e) {
+                            console.log("API Error:", e);
+                            // 如果 API 失敗，恢復狀態
+                            scanBtn.style.display = 'block';
+                            scanBtn.disabled = false; // 恢復啟用狀態，以備下次顯示時正常
+                            scanBtn.innerText = 'Scan Test Board'; // 文字重置
+                        }
+                    }
+                } 
+                else {
+                    // ===========================
+                    //  狀況 B: 比對失敗 (Mismatch)
+                    // ===========================
+                    updateStatusLed('orange', false); // 恢復 IDLE 橘燈
+                    let errorMsg = "Board Mismatch!";
+                    if (detectedId === 0 || isNaN(detectedId)) {
+                        errorMsg = "No Board Detected.";
+                    } else {
+                        if (detectedId == 1){
+                            errorMsg = `Mismatch! Found ID: MCU`;
+                        }
+                        else if (detectedId == 2){
+                            errorMsg = `Mismatch! Found ID: ATB`;
+                        }
+                        else{
+                            errorMsg = `Mismatch! Found ID: UNKNOW`;
+                        }
+                    }
+                    showToast(errorMsg);
+                    // 復原 Scan 按鈕狀態，讓使用者可以再次嘗試
+                    if (scanBtn) {
+                        scanBtn.innerText = 'Scan Test Board'; // 移除 Loading 文字
+                        scanBtn.disabled = false;              // 重新啟用按鈕
+                    }
+                    // 確保 Test 按鈕繼續隱藏
+                    if (testBtn) {
+                        testBtn.style.display = 'none';
+                    }
+                }
+            }
+        };
+
+        async function exportBlockDefinitions() {
+            const allBlocks = {};
+            const blockTypes = Object.keys(Blockly.Blocks);
+            // showToast("正在掃描積木結構...");
+            blockTypes.forEach(type => {
+                if (type.startsWith('flyout_')) return;
+                try {
+                    const tempWorkspace = new Blockly.Workspace();
+                    const block = tempWorkspace.newBlock(type);
+                    
+                    const info = {
+                        type: type,
+                        fields: [],
+                        inputs: [],
+                        output: block.outputConnection ? block.outputConnection.check_ : null,
+                        hasPrevious: !!block.previousConnection,
+                        hasNext: !!block.nextConnection
+                    };
+                    block.inputList.forEach(input => {
+                        input.fieldRow.forEach(field => {
+                            if (field.name) {
+                                info.fields.push({
+                                    name: field.name,
+                                    type: field.constructor.name
+                                });
+                            }
+                        });
+                        if (input.name) {
+                            info.inputs.push({
+                                name: input.name,
+                                type: input.type 
+                            });
+                        }
+                    });
+                    allBlocks[type] = info;
+                    tempWorkspace.dispose();
+                } catch (e) {
+                    allBlocks[type] = { type: type, error: "Initialization failed" };
+                }
+            });
+            const jsonStr = JSON.stringify(allBlocks, null, 2);
+            // --- 改為存檔模式 ---
+            const blob = new Blob([jsonStr], { type: "application/json" });
+            try {
+                // 優先使用現代的檔案存取 API (可自選路徑)
+                if (window.showSaveFilePicker) {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: 'block_definitions_spec.json',
+                        types: [{
+                            description: 'JSON Files',
+                            accept: {'application/json': ['.json']},
+                        }],
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                    // showToast("定義檔已儲存！");
+                } else {
+                    // 備用方案：直接觸發瀏覽器下載
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "block_definitions_spec.json";
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    // showToast("已存至下載資料夾");
+                }
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.error(err);
+                    // showToast("存檔失敗");
+                }
+            }
+        }
         // 初始化函式
         function initApp() {
             console.log("App initializing...");
             // 呼叫 script/index.js 中的 start()
             if (typeof start === 'function') {
-                start(); 
+                start();
+                updateDebugUI(); // 初始化時根據預設值更新一次 UI
             } else {
                 console.error("找不到 start() 函式，請檢查 script/index.js 是否載入成功");
             }
         }
-
-        // 輸出按鈕功能
-        function exportPython() {
-            // 這裡主要觸發 UI 顯示，實際邏輯由 index.js 的 EventListener 處理
-            const pane = document.getElementById('outputPane');
-            pane.style.display = 'flex';
-        }
     </script>
-
 </body>
 </html>

@@ -2,7 +2,7 @@
   "name": "devverifygui",
   "displayName": "DevVerifyGUI",
   "description": "",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "publisher": "aes",
   "engines": {
     "vscode": "^1.107.0"
@@ -18,14 +18,14 @@
     "commands": [
       {
         "command": "devverifygui.devverifygui",
-        "title": "開啟 DevVerifyGUI 面板"
+        "title": "Open DevVerifyGUI Dashboard"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
           "id": "my-trigger-sidebar",
-          "title": "啟動 DevVerifyGUI",
+          "title": "Start DevVerifyGUI",
           "icon": "icon.png"
         }
       ]
@@ -36,7 +36,7 @@
           "type": "webview",
           "id": "my-extension-view",
           "icon": "icon.png",
-          "name": "正在啟動..."
+          "name": "Progressing..."
         }
       ]
     }
