@@ -1,0 +1,40 @@
+# 忽略 Git 相關
+.git/
+.gitignore
+**/*.map
+**/*.ts    # 如果有 TypeScript 原始碼，打包時通常只需編譯後的 .js
+
+# 忽略開發設定檔
+.vscode/
+.vscodeignore
+jsconfig.json
+tsconfig.json
+**/*.map
+
+# 忽略 Node.js 依賴 (看情況)
+# 如果您的 extension 執行時不需要任何 npm 套件(通常 simple webview 不需要)，可以忽略它來縮小體積
+# 但如果您不確定，先不要加這行，讓 vsce 自動判斷
+# node_modules/
+
+# ==================================
+# Blockly 瘦身專區 (針對 blockly 資料夾)
+# ==================================
+# 排除範例
+blockly/demos/
+blockly/tests/
+# 排除原始碼 (因為您只需要 *_compressed.js)
+blockly/src/
+blockly/core/
+blockly/generators/   # 如果用的是 compressed 版本，這也不需要
+blockly/blocks/       # 同上
+# 排除建置腳本與說明
+blockly/scripts/
+blockly/package.json
+blockly/README.md
+
+# 忽略原始碼 (如果不希望發布原始碼)
+# 但通常 index.html 和 extension.js 必須保留
+
+# --- 說明文件 (視需求保留) ---
+# README.md (通常會保留)
+# CHANGELOG.md (通常會保留)
