@@ -8,3 +8,4 @@ pyserial
 mypy
 djlint
 jsbeautifier
+opencv-python-headless
