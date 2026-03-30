@@ -1,0 +1,10 @@
+pywebview
+pyinstaller
+matplotlib
+psutil
+debugpy
+nuitka
+pyserial
+mypy
+djlint
+jsbeautifier

@@ -1,0 +1,34 @@
+# exclude directory
+**/build/
+**/CMakeFiles/
+**/__*py*__/
+**/__pycache__/
+# **/release/
+**/release/index.dist/
+**/_internal/
+**/.venv/
+**/vscode_ext/node_modules/
+**/vscode_ext/application/
+**/application/backend/lib/gens_data/
+**/application/gens_data/
+**/OVWorking/
+
+# exclude files
+**/*.cmake
+**/CMakeCache.txt
+**/application/backend/lib/*.bin
+**/application/backend/lib/*.html
+**/application/*.dll
+.DS_Store
+*.bak
+*.tmp
+*.new
+*.old
+README.pdf
+**/report*.html
+
+# include files
+# \!build/*.dll
+\!release/DevVerifyGUI.vsix
+\!release/mcu_i3c_beta.hex
+\!release/fpga_autotest.hex

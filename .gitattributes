@@ -1,0 +1,73 @@
+# --- 專案特定路徑管理 ---
+tools/ninja/**    filter=lfs diff=lfs merge=lfs -text
+tools/nsis_bin/** filter=lfs diff=lfs merge=lfs -text
+
+# 後端硬體庫與資源
+application/backend/lib/**          filter=lfs diff=lfs merge=lfs -text
+application/backend/src/resource/** filter=lfs diff=lfs merge=lfs -text
+
+# 前端多媒體與渲染器
+application/media/**   filter=lfs diff=lfs merge=lfs -text
+application/mermaid/** filter=lfs diff=lfs merge=lfs -text
+
+# 發布輸出
+release/** filter=lfs diff=lfs merge=lfs -text
+
+# --- 全域二進位格式防護 (LFS) ---
+# 圖片與多媒體
+*.png    filter=lfs diff=lfs merge=lfs -text
+*.jpg    filter=lfs diff=lfs merge=lfs -text
+*.jpeg   filter=lfs diff=lfs merge=lfs -text
+*.gif    filter=lfs diff=lfs merge=lfs -text
+*.ico    filter=lfs diff=lfs merge=lfs -text
+*.svg    filter=lfs diff=lfs merge=lfs -text
+*.drawio filter=lfs diff=lfs merge=lfs -text
+*.mp3    filter=lfs diff=lfs merge=lfs -text
+*.ogg    filter=lfs diff=lfs merge=lfs -text
+*.cur    filter=lfs diff=lfs merge=lfs -text
+*.wav    filter=lfs diff=lfs merge=lfs -text
+
+# Office 文件與 PDF
+*.doc  filter=lfs diff=lfs merge=lfs -text
+*.docx filter=lfs diff=lfs merge=lfs -text
+*.xls  filter=lfs diff=lfs merge=lfs -text
+*.xlsx filter=lfs diff=lfs merge=lfs -text
+*.ppt  filter=lfs diff=lfs merge=lfs -text
+*.pptx filter=lfs diff=lfs merge=lfs -text
+*.pdf  filter=lfs diff=lfs merge=lfs -text
+
+# 壓縮檔
+*.zip filter=lfs diff=lfs merge=lfs -text
+*.rar filter=lfs diff=lfs merge=lfs -text
+*.7z  filter=lfs diff=lfs merge=lfs -text
+
+# 編譯產物與程式庫
+*.dll  filter=lfs diff=lfs merge=lfs -text
+*.so   filter=lfs diff=lfs merge=lfs -text
+*.pyd  filter=lfs diff=lfs merge=lfs -text
+*.exe  filter=lfs diff=lfs merge=lfs -text
+*.bin  filter=lfs diff=lfs merge=lfs -text
+*.lib  filter=lfs diff=lfs merge=lfs -text
+*.hex  filter=lfs diff=lfs merge=lfs -text
+*.a    filter=lfs diff=lfs merge=lfs -text
+*.o    filter=lfs diff=lfs merge=lfs -text
+*.ex_  filter=lfs diff=lfs merge=lfs -text
+*.ovpi filter=lfs diff=lfs merge=lfs -text
+
+# --- 全域排除規則 (確保這些副檔名永遠不進 LFS，強制走文字比對) ---
+*.cmake  text filter= diff= merge=
+*.txt     text filter= diff= merge=
+*.md      text filter= diff= merge=
+*.py      text filter= diff= merge=
+*.json    text filter= diff= merge=
+*.js      text filter= diff= merge=
+*.ts      text filter= diff= merge=
+*.c       text filter= diff= merge=
+*.h       text filter= diff= merge=
+*.cpp     text filter= diff= merge=
+*.hpp     text filter= diff= merge=
+*.ini     text filter= diff= merge=
+*.html    text filter= diff= merge=
+*.css     text filter= diff= merge=
+*.mjs     text filter= diff= merge=
+*.*proj   text filter= diff= merge=

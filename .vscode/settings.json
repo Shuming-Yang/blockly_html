@@ -1,0 +1,96 @@
+{
+    "files.associations": {
+        "*.src": "c",
+        "*.com": "c",
+        "*.h": "c",
+        "*.c": "c",
+        "type_traits": "c",
+        "random": "c",
+        "array": "c",
+        "string": "c",
+        "*.json": "jsonc",
+        "charconv": "c",
+        "chrono": "c",
+        "limits": "c",
+        "semaphore": "c",
+        "cstdlib": "c",
+        "string_view": "c",
+        "functional": "c",
+        "tuple": "c",
+        "utility": "c",
+        "istream": "c",
+        "ostream": "c"
+    },
+    "editor.wordWrap": "on",
+    "editor.wordWrapColumn": 220,
+    // "workbench.startupEditor": "project-dashboard.open",  // 將 VS Code 的啟動畫面設定為 Project Dashboard 的開啟指令
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+    "python.analysis.autoImportCompletions": true,
+    // 針對 Pylance (型別檢查): 關閉它的型別報錯，只留 IntelliSense，避免跟 Pylint 搶戲
+    "python.analysis.typeCheckingMode": "off",
+    "python.analysis.extraPaths": [
+        "./application",
+        "./application/backend/src",
+        "./application/backend/src/gens"
+    ],
+    "todo-tree.general.tags": [
+        "TOIMPLEMENT",
+        "[ ]",
+        "[x]"
+    ],
+    "workbench.editor.enablePreview": false,
+    "files.exclude": {
+        "**/.gitlab": true,
+        "**/build": true,
+        "**/README.pdf": true,
+        "**/sample": true
+    },
+    // 確保套件不會載入 .gitignore 檔案的設定
+    // 這對你的需求至關重要，因為你希望 Git 繼續追蹤
+    "ProjectTree.theme": "perfect",
+    "ProjectTree.withComment": false,
+    "ProjectTree.commentDistance": 10,
+    "ProjectTree.loadIgnore": true,
+    "ProjectTree.distFileName": "README.md",
+    // 在這裡列出你所有不希望顯示在目錄樹中的資料夾
+    "ProjectTree.ignoreFolders": [
+        "**/.gitlab",
+        "**/build",
+        "**/README.pdf",
+        "**/sample",
+    ],
+    "vscode-edge-devtools.webhint": false,
+    // 關閉 Flake8
+    // 針對新版 Microsoft Flake8 套件 (ms-python.flake8)
+    "flake8.enabled": false,
+    // 針對舊版 Python 套件內建的 linting 功能 (防呆用)
+    "python.linting.flake8Enabled": false,
+    // 強制啟用 Pylint
+    // 針對新版 Microsoft Pylint 套件 (ms-python.pylint)
+    "pylint.enabled": true,
+    // 針對舊版 Python 套件內建的 linting 功能
+    "python.linting.pylintEnabled": true,
+    "python.linting.enabled": true,
+    "pylint.args": [
+        "--max-line-length=220",
+        "--max-args=20", // 設定函數允許的最大參數數量為20, 預設值為5
+        "--max-locals=50", // 設定函數允許的最大局部變數數量為30, 預設值為5
+        "--max-statements=150", // 設定函數允許的最大語句數量為90, 預設值為50
+        "--max-branches=30", // 設定函數允許的最大分支數量為30, 預設值為12
+        "--max-public-methods=20", // 設定類允許的最大公有方法數量, 預設值為20
+        "--max-attributes=20", // 設定類允許的最大屬性數量, 預設值為20
+        "--min-public-methods=0", // 設定類允許的最少公有方法數量, 預設值為0
+        "--max-module-lines=3600", // 將模組最大行數調整為 3600 行
+        "--max-attributes=50", // 設定類允許的最大屬性數量, 預設值為20
+        "--max-returns=10", // 設定函數允許的最大回傳數量為10, 預設值為6
+        "--disable=C0103,C0114,C0115,C0116,R0904,R0917,W0212,W0718" // 忽略某些警告
+    ],
+    // 設定 Pylint 使用策略
+    // 確保使用當前環境 (venv) 下安裝的 pylint，而非 VS Code 內建版本
+    "pylint.importStrategy": "fromEnvironment",
+    "cmake.generator": "Ninja",
+    "cmake.preferredGenerators": ["Ninja"],
+    "cmake.configureSettings": {
+        "CMAKE_MAKE_PROGRAM": "${workspaceFolder}/tools/ninja/win/ninja.exe"
+    }
+}
