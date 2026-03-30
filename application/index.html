@@ -14,7 +14,7 @@
     <script src="script/binmode_json.js"></script>
     <script>
         (function() {
-            // 模組化共用邏輯：將訊息轉發給 Python
+            // 模組化共用邏輯 將訊息轉發給 Python
             function forwardMessageToPython(args) {
                 if (window.pywebview && window.pywebview.api && window.pywebview.api.js_log) {
                     // 將所有參數轉成一個字串
@@ -55,43 +55,50 @@
     </script>
     <link rel="stylesheet" href="index.css">
     <style>
-        /* 強制解除 Log 面板的文字選取限制，恢復滑鼠反白與複製功能 */
-        .log-viewport, 
-        .log-viewport *,
+        /* 強制解除 Log 面板的文字選取限制 恢復滑鼠反白與複製功能 (排除影像預覽面板) */
+        .log-viewport:not(#streamLog), 
+        .log-viewport:not(#streamLog) *,
         .i2c-terminal,
         .i2c-terminal * {
             user-select: text !important;
-            -webkit-user-select: text !important; /* 支援 Webkit 核心瀏覽器 */
-            cursor: text !important; /* 讓滑鼠游標移過去時變成輸入文字的「I」字型 */
+            -webkit-user-select: text !important;
+            /* 支援 Webkit 核心瀏覽器 */
+            cursor: text !important;
+            /* 讓滑鼠游標移過去時變成輸入文字的 I 字型 */
         }
         /* ==========================================
            自定義 Blockly 畫布漂浮按鈕 (清空工作區)
            ========================================== */
         .blockly-custom-clear-btn {
             position: absolute;
-            right: 35px;       /* 右邊距 */
-            /* 計算高度：
-               底部分散度(約20px) + 垃圾桶(依配置) + 縮放塊群組。
-               靶心通常在最頂端。放在靶心再往上一個單位的距離 */
+            right: 35px;
+            /* 右邊距 */
+            /* 計算高度
+               底部分散度(約20px) + 垃圾桶(依配置) + 縮放塊群組
+               靶心通常在最頂端 放在靶心再往上一個單位的距離 */
             bottom: 230px;
-            z-index: 100;       /* 確保蓋在畫布上面 */
-            /* 大小：匹配 Blockly 原生按鈕標準尺寸 */
+            z-index: 100;
+            /* 確保蓋在畫布上面 */
+            /* 大小 匹配 Blockly 原生按鈕標準尺寸 */
             width: 30px;
             height: 30px;
-            background-color: rgba(255, 255, 255, 0.85); /* 半透明白 */
+            background-color: rgba(255, 255, 255, 0.85);
+            /* 半透明白 */
             border: 1px solid #ccc;
-            border-radius: 4px; /* 微圓角方形 */
+            border-radius: 4px;
+            /* 微圓角方形 */
             box-shadow: 0 1px 3px rgba(0,0,0,0.3);
             cursor: pointer;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 14px;    /* 縮小 Emoji 以適應 30px 的按鈕 */
+            font-size: 14px;
+            /* 縮小 Emoji 以適應 30px 的按鈕 */
             transition: background-color 0.2s, box-shadow 0.2s;
             padding: 0;
             outline: none;
         }
-        /* 滑鼠懸停效果：匹配 Blockly 原生風格 */
+        /* 滑鼠懸停效果 匹配 Blockly 原生風格 */
         .blockly-custom-clear-btn:hover {
             background-color: rgba(255, 255, 255, 1);
             border-color: #ccc;
@@ -163,6 +170,7 @@
                     <button class="tab-btn" onclick="switchLogTab('serial', event)">COM Port</button>
                     <button class="tab-btn" onclick="switchLogTab('i2c', event)">I2C Operations</button>
                     <button class="tab-btn" onclick="switchLogTab('ovdb', event)">OVDB File Opt</button>
+                    <button class="tab-btn" onclick="switchLogTab('stream', event)">🎥 Video Preview</button>
                     <div id="portSelectorContainer" class="port-selector-container" style="display: none;">
                         <select id="comPortSelect" title="Select COM Port" aria-label="Select COM Port">
                             <option value="">Searching Ports...</option>
@@ -237,6 +245,85 @@
                         </div>
                         <div class="ovdb-panel ovdb-right">
                             <div id="ovdbOutput" class="ovdb-log-content"></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="streamLog" class="log-viewport">
+                    <div class="stream-toolbar">
+                        <button id="streamToggleBtn" onclick="toggleStream()">▶️ Start Stream</button>
+                    </div>
+                    <div class="stream-grid">
+                        <div class="stream-cell" onclick="toggleVcToolbar(0)">
+                            <div class="vc-toolbar" id="vcToolbar0" onclick="event.stopPropagation()">
+                                <span class="vc-title">VC 0</span>
+                                <select id="vcFormat0" title="Format">
+                                    <option value="5" selected>RAW</option>
+                                    <option value="7">RAW16</option>
+                                    <option value="3">YUV420</option>
+                                    <option value="2">YUV422</option>
+                                    <option value="1">YUV444</option>
+                                    <option value="4">RGB888</option>
+                                    <option value="6">RGB565</option>
+                                </select>
+                                <input type="number" id="vcWidth0" value="1920" title="Width">
+                                <span style="color:#888;">x</span>
+                                <input type="number" id="vcHeight0" value="1080" title="Height">
+                            </div>
+                            <img id="vcImg0" src="">
+                        </div>
+                        <div class="stream-cell" onclick="toggleVcToolbar(1)">
+                            <div class="vc-toolbar" id="vcToolbar1" onclick="event.stopPropagation()">
+                                <span class="vc-title">VC 1</span>
+                                <select id="vcFormat1" title="Format">
+                                    <option value="5" selected>RAW</option>
+                                    <option value="7">RAW16</option>
+                                    <option value="3">YUV420</option>
+                                    <option value="2">YUV422</option>
+                                    <option value="1">YUV444</option>
+                                    <option value="4">RGB888</option>
+                                    <option value="6">RGB565</option>
+                                </select>
+                                <input type="number" id="vcWidth1" value="1920" title="Width">
+                                <span style="color:#888;">x</span>
+                                <input type="number" id="vcHeight1" value="1080" title="Height">
+                            </div>
+                            <img id="vcImg1" src="">
+                        </div>
+                        <div class="stream-cell" onclick="toggleVcToolbar(2)">
+                            <div class="vc-toolbar" id="vcToolbar2" onclick="event.stopPropagation()">
+                                <span class="vc-title">VC 2</span>
+                                <select id="vcFormat2" title="Format">
+                                    <option value="5" selected>RAW</option>
+                                    <option value="7">RAW16</option>
+                                    <option value="3">YUV420</option>
+                                    <option value="2">YUV422</option>
+                                    <option value="1">YUV444</option>
+                                    <option value="4">RGB888</option>
+                                    <option value="6">RGB565</option>
+                                </select>
+                                <input type="number" id="vcWidth2" value="1920" title="Width">
+                                <span style="color:#888;">x</span>
+                                <input type="number" id="vcHeight2" value="1080" title="Height">
+                            </div>
+                            <img id="vcImg2" src="">
+                        </div>
+                        <div class="stream-cell" onclick="toggleVcToolbar(3)">
+                            <div class="vc-toolbar" id="vcToolbar3" onclick="event.stopPropagation()">
+                                <span class="vc-title">VC 3</span>
+                                <select id="vcFormat3" title="Format">
+                                    <option value="5" selected>RAW</option>
+                                    <option value="7">RAW16</option>
+                                    <option value="3">YUV420</option>
+                                    <option value="2">YUV422</option>
+                                    <option value="1">YUV444</option>
+                                    <option value="4">RGB888</option>
+                                    <option value="6">RGB565</option>
+                                </select>
+                                <input type="number" id="vcWidth3" value="1920" title="Width">
+                                <span style="color:#888;">x</span>
+                                <input type="number" id="vcHeight3" value="1080" title="Height">
+                            </div>
+                            <img id="vcImg3" src="">
                         </div>
                     </div>
                 </div>
@@ -1782,7 +1869,7 @@
                 }
             }
             // 當切換到 OVDB 面板時，自動將 System Panel 放大到最大
-            if (type === 'ovdb') {
+            if (type === 'ovdb' || type === 'stream') {
                 const consoleArea = document.getElementById('consoleArea');
                 const resizeBtn = document.getElementById('consoleResizeBtn');
                 if (consoleArea) {
@@ -1835,6 +1922,10 @@
                 // 只清除 OVDB 右側的 Log
                 const ovdbOutput = document.getElementById('ovdbOutput');
                 if (ovdbOutput) ovdbOutput.innerHTML = '';
+            } else if (activeViewport.id === 'streamLog') {
+                // 影像預覽面板保護：直接 return，不執行任何動作
+                // 防止工具列與 2x2 網格被 innerHTML = '' 給誤刪
+                return;
             } else {
                 // --- Application 或 COM Port 頁面的預設清除邏輯 ---
                 activeViewport.innerHTML = '';
@@ -2493,6 +2584,100 @@
                 listContainer.appendChild(itemDiv);
             });
         }
+
+        // ==========================================
+        // Camera Stream 預覽邏輯
+        // ==========================================
+        let isStreaming = false;
+
+        // 點擊畫面切換該 VC 專屬工具列的顯示/隱藏
+        function toggleVcToolbar(channel) {
+            // 防呆：串流中不允許切換收合狀態 (或是你可以拿掉這個 if 讓串流中也能隱藏工具列看乾淨畫面)
+            // 串流中也能點擊隱藏 視覺比較乾淨 但裡面的 input 已被鎖定不能改
+            const toolbar = document.getElementById(`vcToolbar${channel}`);
+            if (toolbar) {
+                toolbar.classList.toggle('hidden');
+            }
+        }
+
+        async function toggleStream() {
+            const btn = document.getElementById('streamToggleBtn');
+            if (!isStreaming) {
+                // 收集 4 個 VC 的獨立設定
+                let vcConfigs = [];
+                for (let i = 0; i < 4; i++) {
+                    const format = parseInt(document.getElementById(`vcFormat${i}`).value);
+                    const width = parseInt(document.getElementById(`vcWidth${i}`).value);
+                    const height = parseInt(document.getElementById(`vcHeight${i}`).value);
+                    if (!width || !height || width <= 0 || height <= 0) {
+                        showToast(`Error: Invalid Size in VC ${i}`);
+                        return; // 中斷啟動
+                    }
+                    vcConfigs.push({ channel: i, format: format, width: width, height: height });
+                }
+                // 切換 UI 為啟動狀態 (並鎖定所有輸入框)
+                toggleStreamState(true);
+                // 呼叫 Python 後端 (將陣列轉為 JSON 字串傳遞)
+                if (window.pywebview && window.pywebview.api && window.pywebview.api.start_camera_stream) {
+                    try {
+                        const configJson = JSON.stringify(vcConfigs);
+                        const ret = await window.pywebview.api.start_camera_stream(configJson);
+                        if (ret === 0) showToast("Stream Started");
+                        else throw new Error("Backend error: " + ret);
+                    } catch (e) {
+                        showToast("Failed to start stream.");
+                        toggleStreamState(false); 
+                    }
+                } else {
+                    console.log("[Simulation] Start Stream with Configs:", vcConfigs);
+                    showToast("[Simulation] Stream Started");
+                }
+            } else {
+                // 執行停止邏輯
+                toggleStreamState(false);
+                if (window.pywebview && window.pywebview.api && window.pywebview.api.stop_camera_stream) {
+                    await window.pywebview.api.stop_camera_stream();
+                    showToast("Stream Stopped");
+                } else {
+                    showToast("[Simulation] Stream Stopped");
+                }
+            }
+        }
+        // 強制重置 UI 狀態與表單鎖定
+        function toggleStreamState(state) {
+            isStreaming = state;
+            const btn = document.getElementById('streamToggleBtn');
+            // 鎖定或解鎖所有的 select 和 input
+            const controls = document.querySelectorAll('.vc-toolbar select, .vc-toolbar input');
+            controls.forEach(control => {
+                control.disabled = state;
+            });
+            if (btn) {
+                if (state) {
+                    btn.innerText = "⏹️ Stop Stream";
+                    btn.classList.add('streaming');
+                } else {
+                    btn.innerText = "▶️ Start Stream";
+                    btn.classList.remove('streaming');
+                }
+            }
+            // 清空畫面的殘影
+            if (!state) {
+                for(let i=0; i<4; i++) {
+                    const img = document.getElementById(`vcImg${i}`);
+                    if(img) img.src = "";
+                }
+            }
+        }
+
+        // 留給 Python 後端主動呼叫的介面 (透過 window.evaluate_js)
+        // 傳入虛擬通道(0~3)以及影像的 Base64 字串
+        window.updateStreamFrame = function(channel, base64Data) {
+            const img = document.getElementById(`vcImg${channel}`);
+            if (img && base64Data) {
+                img.src = "data:image/jpeg;base64," + base64Data;
+            }
+        };
 
         // ==========================================
         // 監聽專用的 ready 事件

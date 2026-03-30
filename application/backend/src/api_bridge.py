@@ -731,6 +731,47 @@ class ApiBridge:
     def send_db_file(self, setting_index):
         return self._venus_mgr.send_db_file(setting_index=setting_index)
 
+    # =========================================================
+    # Camera Stream 預覽相關介面
+    # =========================================================
+    def start_camera_stream(self, config_json: str) -> int:
+        """
+        前端請求啟動影像預覽
+        :param config_json: 包含 4 個 VC 設定的 JSON 字串
+        :return: 0 代表成功啟動，其他代表失敗
+        """
+        self._log(f"Received request to START stream with configs: {config_json}")
+        try:
+            # 解析前端傳來的 JSON 字串
+            # 解析後 vc_configs 會是一個 List，裡面包著 Dict：
+            # [{'channel': 0, 'format': 5, 'width': 1920, 'height': 1080}, ...]
+            vc_configs = json.loads(config_json)
+            # 測試印出每個通道的設定，證明我們成功接到了！
+            for cfg in vc_configs:
+                self._log(f"Setup VC{cfg['channel']}: {cfg['width']}x{cfg['height']} Fmt:{cfg['format']}")
+            # 這裡之後會實作：
+            # - 初始化 Flask 串流伺服器
+            # - 呼叫每個 VC 進行設定並 StartStream()
+            return 0
+        except Exception as e:
+            self._log(f"Error starting stream: {e}")
+            return -1
+
+    def stop_camera_stream(self) -> int:
+        """
+        前端請求停止影像預覽
+        """
+        self._log("Received request to STOP stream.")
+        try:
+            # 之後實作：
+            # 1. 呼叫硬體 DLL 的 StopStream() 取消註冊 Callback
+            # 2. 關閉背景串流伺服器與 Thread
+            # 模擬成功
+            return 0
+        except Exception as e:
+            self._log(f"Error stopping stream: {e}")
+            return -1
+
     def close(self) -> None:
         """應用程式關閉前掛載的清理鉤子，負責釋放核心硬體通訊埠資源"""
         if self._venus_mgr:

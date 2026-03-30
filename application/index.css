@@ -1095,19 +1095,19 @@ I2C Operations 專屬樣式
     flex-direction: column;
 }
 
-/* 🌟 I2C Log 顯示區的高度壓縮設定 */
+/* I2C Log 顯示區的高度壓縮設定 */
 .i2c-terminal {
     flex: 1;
     padding: 4px 8px;
     /* 縮小內縮距離 */
     overflow-y: auto;
     overflow-x: auto;
-    /* 允許橫向捲動，保護對齊格式 */
+    /* 允許橫向捲動 保護對齊格式 */
     font-family: 'Consolas', 'Courier New', monospace;
     font-size: 12.5px;
-    /* 字體再稍微調小一點點，看起來更像系統終端機 */
+    /* 字體再稍微調小一點點 看起來更像系統終端機 */
     line-height: 1.15;
-    /* 將行高壓縮，極大化單頁顯示行數 */
+    /* 將行高壓縮 極大化單頁顯示行數 */
     background-color: #1e1e1e;
 }
 
@@ -1238,6 +1238,165 @@ I2C Operations 專屬樣式
     line-height: 1.4;
     white-space: pre-wrap;
     color: #cccccc;
+}
+
+/* ==========================================
+    Camera Preview (Stream) 專屬樣式
+    ========================================== */
+/* 預設狀態 確保它乖乖隱藏 */
+#streamLog {
+    display: none; 
+}
+
+/* 啟動狀態 只有被掛上 active 時 才使用 Flex 垂直排版向上靠齊 */
+#streamLog.active {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    justify-content: flex-start; 
+}
+
+.stream-toolbar {
+    display: flex;
+    gap: 15px;
+    padding: 8px 15px;
+    background-color: #252526;
+    border-bottom: 1px solid #3c3c3c;
+    align-items: center;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+.stream-toolbar select, .stream-toolbar input {
+    background: #3c3c3c;
+    color: #ccc;
+    border: 1px solid #555;
+    padding: 4px 8px;
+    border-radius: 3px;
+}
+
+.stream-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    /* 兩欄 */
+    grid-template-rows: 1fr 1fr;
+    /* 兩列 */
+    gap: 0px;
+    /* 0px 消除所有網格間距 */
+    background-color: #1e1e1e;
+    flex-grow: 1;
+    /* 自動延伸並吃掉下方所有剩餘空間 */
+    overflow: hidden;
+}
+
+.stream-cell {
+    position: relative;
+    background-color: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.stream-cell img {
+    max-width: 100%;
+    max-height: 100%;
+    /* 保持長寬比 自動縮放塞滿容器 */
+    object-fit: contain; 
+}
+
+/* ==========================================
+    Camera Preview - 懸浮 VC 工具列
+    ========================================== */
+.stream-toolbar {
+    display: flex;
+    justify-content: flex-start;
+    /* 按鈕靠左靠上 */
+    padding: 8px 15px;
+    background-color: #252526;
+    border-bottom: 1px solid #3c3c3c;
+    flex-shrink: 0;
+}
+
+.stream-cell {
+    position: relative;
+    background-color: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    /* 防止懸浮列凸出去 */
+    cursor: pointer;
+    /* 讓滑鼠移上去有可點擊的提示 */
+}
+
+.stream-cell img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain; 
+    pointer-events: none;
+    /* 讓點擊事件直接穿透給底層的 stream-cell */
+}
+
+/* 每個 VC 上方的半透明懸浮設定列 */
+.vc-toolbar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background-color: rgba(37, 37, 38, 0.85);
+    /* 半透明深灰 */
+    display: flex;
+    gap: 8px;
+    padding: 6px 10px;
+    align-items: center;
+    box-sizing: border-box;
+    transition: transform 0.25s ease-in-out;
+    /* 平滑收合動畫 */
+    z-index: 10;
+    cursor: default;
+    /* 工具列區域滑鼠恢復預設 */
+}
+
+/* 隱藏狀態 將工具列往上推移出可見範圍 */
+.vc-toolbar.hidden {
+    transform: translateY(-100%);
+}
+
+.vc-toolbar select, .vc-toolbar input {
+    background: #333;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 3px;
+    padding: 2px 4px;
+    font-size: 12px;
+}
+.vc-toolbar input[type="number"] {
+    width: 55px;
+    text-align: center;
+}
+.vc-title {
+    font-weight: bold;
+    color: #4ec9b0;
+    margin-right: 10px;
+    font-family: monospace;
+}
+/* 鎖定狀態下的樣式 */
+.vc-toolbar select:disabled, .vc-toolbar input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+#streamToggleBtn {
+    background-color: #0e639c;
+    /* 預設藍色啟動按鈕 */
+    color: white;
+    font-weight: bold;
+    min-width: 120px;
+}
+
+#streamToggleBtn.streaming {
+    background-color: #d9534f;
+    /* 串流中變成紅色停止按鈕 */
 }
 
 .blink {
