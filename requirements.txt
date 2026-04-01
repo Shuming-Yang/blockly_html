@@ -9,3 +9,4 @@ mypy
 djlint
 jsbeautifier
 opencv-python-headless
+pywin32

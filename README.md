@@ -34,6 +34,7 @@ LOCAL_blockly_html
 │  │       ├── report_mgr.py     # [任務] 產生測試報告
 │  │       ├── fw_bin.py         # [資源] ATB Firmware Binary 資料
 │  │       ├── shared_utils.py   # [任務] 共用工具程式集(不可import 其他的porject模塊)
+│  │       ├── stream_mgr.py     # [任務] 影像資料管理員
 │  │       ├── gens/             # [任務] Gens 邏輯區
 │  │       └── resource/         # [資源] 靜態文件、預設設定檔、圖片
 │  ├─ blockly                    # [frontend 子資料夾] Blockly 官方函式庫 v12.3.1

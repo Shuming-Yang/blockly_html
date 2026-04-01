@@ -1,0 +1,3303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blockly VS Code Integration</title>
+    <script src="mermaid/mermaid.min.js"></script>
+    <script src="script/flowchart.js"></script>
+    <script src="blockly/blockly.min.js"></script>
+    <script src="blockly/python_compressed.js"></script>
+    <script src="script/python_custom.js"></script>
+    <script src="script/index.js"></script>
+    <script src="script/jsonout.js"></script>
+    <script src="script/binmode_json.js"></script>
+    <script>
+        (function() {
+            // 模組化共用邏輯 將訊息轉發給 Python
+            function forwardMessageToPython(args) {
+                if (window.pywebview && window.pywebview.api && window.pywebview.api.js_log) {
+                    // 將所有參數轉成一個字串
+                    const message = Array.from(args).map(arg =>
+                        typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+                    ).join(' ');
+                    // 直接將格式化後的訊息傳給 Python
+                    window.pywebview.api.js_log(message);
+                }
+            }
+            // 轉接 console.log
+            const originalLog = console.log;
+            console.log = function() {
+                // 依然在瀏覽器終端機印出
+                originalLog.apply(console, arguments);
+                // 只有在 debug 模式下才轉發 console.log
+                if (isDebugMode) {
+                    forwardMessageToPython(arguments);
+                }
+            };
+            // 轉接 console.warn
+            const originalWarn = console.warn;
+            console.warn = function() {
+                // 依然在瀏覽器終端機印出
+                originalWarn.apply(console, arguments);
+                // 將訊息轉發給 Python
+                forwardMessageToPython(arguments);
+            };
+            // 轉接 console.error
+            const originalError = console.error;
+            console.error = function() {
+                // 依然在瀏覽器終端機印出
+                originalError.apply(console, arguments);
+                // 將訊息轉發給 Python
+                forwardMessageToPython(arguments);
+            };
+        })();
+    </script>
+    <link rel="stylesheet" href="index.css">
+    <style>
+        /* 強制解除 Log 面板的文字選取限制 恢復滑鼠反白與複製功能 (排除影像預覽面板) */
+        .log-viewport:not(#streamLog), 
+        .log-viewport:not(#streamLog) *,
+        .i2c-terminal,
+        .i2c-terminal * {
+            user-select: text !important;
+            -webkit-user-select: text !important;
+            /* 支援 Webkit 核心瀏覽器 */
+            cursor: text !important;
+            /* 讓滑鼠游標移過去時變成輸入文字的 I 字型 */
+        }
+        /* ==========================================
+           自定義 Blockly 畫布漂浮按鈕 (清空工作區)
+           ========================================== */
+        .blockly-custom-clear-btn {
+            position: absolute;
+            right: 35px;
+            /* 右邊距 */
+            /* 計算高度
+               底部分散度(約20px) + 垃圾桶(依配置) + 縮放塊群組
+               靶心通常在最頂端 放在靶心再往上一個單位的距離 */
+            bottom: 230px;
+            z-index: 100;
+            /* 確保蓋在畫布上面 */
+            /* 大小 匹配 Blockly 原生按鈕標準尺寸 */
+            width: 30px;
+            height: 30px;
+            background-color: rgba(255, 255, 255, 0.85);
+            /* 半透明白 */
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            /* 微圓角方形 */
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 14px;
+            /* 縮小 Emoji 以適應 30px 的按鈕 */
+            transition: background-color 0.2s, box-shadow 0.2s;
+            padding: 0;
+            outline: none;
+        }
+        /* 滑鼠懸停效果 匹配 Blockly 原生風格 */
+        .blockly-custom-clear-btn:hover {
+            background-color: rgba(255, 255, 255, 1);
+            border-color: #ccc;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        /* 按下效果 */
+        .blockly-custom-clear-btn:active {
+            background-color: #e0e0e0;
+        }
+    </style>
+</head>
+
+<body onload="initApp()">
+    <div class="left-sidebar" id="leftSidebar">
+        <div class="group-title">Project</div>
+        <div class="project-info">
+            <input type="text" id="projectNameInput" 
+                   placeholder="Project Name" 
+                   onfocus="if(this.value === 'Untitled Project') this.value = ''"
+                   onblur="if(this.value === '') { this.value = 'Untitled Project'; renameProject('Untitled Project'); }"
+                   onchange="renameProject(this.value)">
+            <div class="project-action-grid" id="projectActionGrid">
+                <button title="New Project">📄 New</button>
+                <button title="Open Project">📂 Open</button>
+                <button title="Save Project">💾 Save</button>
+                <button title="Save Project As">📥 Save As</button>
+            </div>
+            <div id="projectStats" class="project-stats">
+                Total: 1 Workspace(s)
+            </div>
+        </div>
+        <div class="group-title">Workspaces</div>
+        <div class="workspace-actions">
+            <button id="newWorkspaceBtn" onclick="createNewWorkspace()">➕ New Workspace</button>
+            <button id="importWorkspaceBtn" onclick="importWorkspace()">📂 Import Workspace</button>
+        </div>
+        <div id="workspaceList" class="workspace-list">
+            <!-- Workspaces will be rendered here -->
+            </div>
+        <!-- 拖拉控制把手 -->
+        <div id="leftSidebarResizer" class="sidebar-resizer" title="Drag to resize"></div>
+    </div>
+    <div class="main-area">
+        <div class="blockly-header">
+            <div class="header-left">
+                <button id="leftSidebarToggleBtn" class="sidebar-toggle-btn expanded" onclick="toggleLeftSidebar()" title="Toggle Left Sidebar">
+                    <!-- Local SVG Assets -->
+                    <img src="media/panel-left.svg" class="icon-show" width="20" height="20" alt="Show Sidebar">
+                    <img src="media/panel-left-close.svg" class="icon-hide" width="20" height="20" alt="Hide Sidebar">
+                </button>
+                <h1>Test Command - Code Editor on</h1>
+                <select id="boardSelect" title="Select Test Mother Board" onchange="handleBoardChange(this.value)" disabled>
+                    <option value="1" selected>MCU Board</option>
+                    <option value="2">ATB Board</option>
+                </select>
+            </div>
+        </div>
+        <div style="position: relative; flex-grow: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden;">
+            <div id="blocklyDiv" style="flex-grow: 1;"></div>
+            <button class="blockly-custom-clear-btn" onclick="cleanTestCase()" title="Clean Workspace">
+                🧹
+            </button>
+        </div>
+        <div class="console-area collapsed" id="consoleArea">
+            <div class="console-toggle" onclick="toggleConsole()">
+                <span id="consoleArrow">▲</span> <span class="console-label">⚙️ System Panel</span>
+            </div>
+            <div class="console-content">
+                <div class="console-tabs">
+                    <button class="tab-btn active" onclick="switchLogTab('app', event)">Application</button>
+                    <button class="tab-btn" onclick="switchLogTab('serial', event)">COM Port</button>
+                    <button class="tab-btn" onclick="switchLogTab('i2c', event)">I2C Operations</button>
+                    <button class="tab-btn" onclick="switchLogTab('ovdb', event)">OVDB File Opt</button>
+                    <button class="tab-btn" onclick="switchLogTab('stream', event)">🎥 Video Preview</button>
+                    <div id="portSelectorContainer" class="port-selector-container" style="display: none;">
+                        <select id="comPortSelect" title="Select COM Port" aria-label="Select COM Port">
+                            <option value="">Searching Ports...</option>
+                        </select>
+                        <button id="refreshPortBtn" class="icon-btn" onclick="refreshComPorts()" title="Refresh Port List">
+                            <span id="refreshIcon">↻</span>
+                        </button>
+                        <span style="color: #888; font-size: 11px; margin-left: 5px;">Baud:</span>
+                        <select id="baudRateSelect" title="Select Serial Baud Rate">
+                            <option value="4800">4800</option>
+                            <option value="9600">9600</option>
+                            <option value="14400">14400</option>
+                            <option value="19200">19200</option>
+                            <option value="38400">38400</option>
+                            <option value="57600">57600</option>
+                            <option value="115200" selected>115200</option>
+                            <option value="230400">230400</option>
+                            <option value="460800">460800</option>
+                            <option value="921600">921600</option>
+                        </select>
+                        <button id="connectPortBtn" onclick="toggleSerialPort()">Connect</button>
+                    </div>
+                    <div style="flex-grow: 1;"></div>
+                    <button id="consoleResizeBtn" class="tab-btn" onclick="cycleConsoleHeight(event)" title="Adjust Console Height">↕️ Normal</button>
+                    <button class="clear-btn" onclick="clearCurrentLog()">Clear</button>
+                </div>
+                <div id="appLog" class="log-viewport active"></div>
+                <div id="serialLog" class="log-viewport"></div>
+                <div id="i2cLog" class="log-viewport">
+                    <div class="i2c-container">
+                        <div class="i2c-controls">
+                            <div class="i2c-row">
+                                <label for="i2cId">Device ID:</label>
+                                <input type="text" id="i2cId" value="">
+                                <div class="spacer"></div>
+                            </div>
+                            <div class="i2c-row">
+                                <label for="i2cAddress">Address</label>
+                                <input type="text" id="i2cAddress" value="">
+                                <select id="addrBitSelect" title="Address Bit Width" aria-label="Address Bit Width">
+                                    <option value="0">8bits</option>
+                                    <option value="16">16bits</option>
+                                    <option value="48" selected>32bits</option>
+                                </select>
+                            </div>
+                            <div class="i2c-row">
+                                <label for="i2cData">Data</label>
+                                <input type="text" id="i2cData" value="">
+                                <select id="dataBitSelect" title="Data Bit Width" aria-label="Data Bit Width">
+                                    <option value="0">8bits</option>
+                                    <option value="1">16bits</option>
+                                    <option value="3" selected>32bits</option>
+                                </select>
+                            </div>
+                            <div class="i2c-actions">
+                                <button id="i2cReadBtn" onclick="i2cRead()">Read</button>
+                                <button id="i2cWriteBtn" onclick="i2cWrite()">Write</button>
+                                <button id="i2cSendFileBtn" onclick="i2cSendFileSettings()">Send From File</button>
+                            </div>
+                        </div>
+                        <div class="i2c-log-area">
+                            <div id="i2cOutput" class="i2c-terminal"></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="ovdbLog" class="log-viewport">
+                    <div class="ovdb-container">
+                        <div class="ovdb-panel ovdb-left">
+                            <button id="loadOvdbBtn" onclick="loadOvdb()">Load OVDB</button>
+                            <div id="ovdbFileList" class="ovdb-file-list">
+                            </div>
+                        </div>
+                        <div class="ovdb-panel ovdb-right">
+                            <div id="ovdbOutput" class="ovdb-log-content"></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="streamLog" class="log-viewport">
+                    <div class="stream-toolbar">
+                        <button id="streamToggleBtn" onclick="toggleStream()">▶️ Start Stream</button>
+                        <label style="margin-left: 15px; color: #ccc; font-size: 13px; cursor: pointer; user-select: none;">
+                            <input type="checkbox" id="globalMirror" onchange="window.updateTransform()" style="vertical-align: middle;"> Mirror
+                        </label>
+                        <label style="margin-left: 10px; color: #ccc; font-size: 13px; cursor: pointer; user-select: none;">
+                            <input type="checkbox" id="globalFlip" onchange="window.updateTransform()" style="vertical-align: middle;"> Flip
+                        </label>
+                        <span id="throughputDisplay" class="throughput-text"></span>
+                    </div>
+                    <div class="stream-grid">
+                        <div class="stream-cell" id="vcCell0" onclick="toggleVcToolbar(0)" ondblclick="window.toggleMaximizeVc(0)">
+                            <div class="vc-toolbar" id="vcToolbar0" onclick="event.stopPropagation()">
+                                <input type="checkbox" id="vcEnable0" checked onchange="window.updateVcState(0)">
+                                <span class="vc-title">VC 0</span>
+                                <select id="vcFormat0" title="Format" onchange="window.updateSeqOptions(0)">
+                                    <option value="5" selected>RAW</option>
+                                    <option value="7">RAW16</option>
+                                    <option value="3">YUV420</option>
+                                    <option value="2">YUV422</option>
+                                    <option value="1">YUV444</option>
+                                    <option value="4">RGB888</option>
+                                    <option value="6">RGB565</option>
+                                </select>
+                                <select id="vcSeq0" title="Pixel Sequence"></select>
+                                <input type="number" id="vcWidth0" value="1920" title="Width">
+                                <span style="color:#888;">x</span>
+                                <input type="number" id="vcHeight0" value="1080" title="Height">
+                            </div>
+                            <img id="vcImg0" src="" alt="VC 0 Preview" width="1920" height="1080">
+                            <div class="fps-counter" id="fpsCounter0">0 FPS</div>
+                        </div>
+                        <div class="stream-cell" id="vcCell1" onclick="toggleVcToolbar(1)" ondblclick="window.toggleMaximizeVc(1)">
+                            <div class="vc-toolbar" id="vcToolbar1" onclick="event.stopPropagation()">
+                                <input type="checkbox" id="vcEnable1" onchange="window.updateVcState(1)">
+                                <span class="vc-title">VC 1</span>
+                                <select id="vcFormat1" title="Format" onchange="window.updateSeqOptions(1)">
+                                    <option value="5" selected>RAW</option>
+                                    <option value="7">RAW16</option>
+                                    <option value="3">YUV420</option>
+                                    <option value="2">YUV422</option>
+                                    <option value="1">YUV444</option>
+                                    <option value="4">RGB888</option>
+                                    <option value="6">RGB565</option>
+                                </select>
+                                <select id="vcSeq1" title="Pixel Sequence"></select>
+                                <input type="number" id="vcWidth1" value="1920" title="Width">
+                                <span style="color:#888;">x</span>
+                                <input type="number" id="vcHeight1" value="1080" title="Height">
+                            </div>
+                            <img id="vcImg1" src="" alt="VC 1 Preview" width="1920" height="1080">
+                            <div class="fps-counter" id="fpsCounter1">0 FPS</div>
+                        </div>
+                        <div class="stream-cell" id="vcCell2" onclick="toggleVcToolbar(2)" ondblclick="window.toggleMaximizeVc(2)">
+                            <div class="vc-toolbar" id="vcToolbar2" onclick="event.stopPropagation()">
+                                <input type="checkbox" id="vcEnable2" onchange="window.updateVcState(2)">
+                                <span class="vc-title">VC 2</span>
+                                <select id="vcFormat2" title="Format" onchange="window.updateSeqOptions(2)">
+                                    <option value="5" selected>RAW</option>
+                                    <option value="7">RAW16</option>
+                                    <option value="3">YUV420</option>
+                                    <option value="2">YUV422</option>
+                                    <option value="1">YUV444</option>
+                                    <option value="4">RGB888</option>
+                                    <option value="6">RGB565</option>
+                                </select>
+                                <select id="vcSeq2" title="Pixel Sequence"></select>
+                                <input type="number" id="vcWidth2" value="1920" title="Width">
+                                <span style="color:#888;">x</span>
+                                <input type="number" id="vcHeight2" value="1080" title="Height">
+                            </div>
+                            <img id="vcImg2" src="" alt="VC 2 Preview" width="1920" height="1080">
+                            <div class="fps-counter" id="fpsCounter2">0 FPS</div>
+                        </div>
+                        <div class="stream-cell" id="vcCell3" onclick="toggleVcToolbar(3)" ondblclick="window.toggleMaximizeVc(3)">
+                            <div class="vc-toolbar" id="vcToolbar3" onclick="event.stopPropagation()">
+                                <input type="checkbox" id="vcEnable3" onchange="window.updateVcState(3)">
+                                <span class="vc-title">VC 3</span>
+                                <select id="vcFormat3" title="Format" onchange="window.updateSeqOptions(3)">
+                                    <option value="5" selected>RAW</option>
+                                    <option value="7">RAW16</option>
+                                    <option value="3">YUV420</option>
+                                    <option value="2">YUV422</option>
+                                    <option value="1">YUV444</option>
+                                    <option value="4">RGB888</option>
+                                    <option value="6">RGB565</option>
+                                </select>
+                                <select id="vcSeq3" title="Pixel Sequence"></select>
+                                <input type="number" id="vcWidth3" value="1920" title="Width">
+                                <span style="color:#888;">x</span>
+                                <input type="number" id="vcHeight3" value="1080" title="Height">
+                            </div>
+                            <img id="vcImg3" src="" alt="VC 3 Preview" width="1920" height="1080">
+                            <div class="fps-counter" id="fpsCounter3">0 FPS</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-toggle" onclick="toggleSidebar()">
+            <span id="toggleArrow">❯</span>
+        </div>
+        <div class="sidebar-group" id="execution-group">
+            <div class="group-title">
+                Test Mode <span id="statusLed" class="status-indicator led-orange"></span>
+            </div>
+            <button id="mcuBinaryTestBtn" onclick="binaryTestMCU()" style="display: none;" data-icon="▶️" data-tooltip="Run MCU Binary">Run Binary</button>
+            <button id="atbBinaryTestBtn" onclick="binaryTestATB()" style="display: none;" data-icon="▶️" data-tooltip="Run ATB Binary">Run Binary</button>
+            <button id="abortTestBtn" onclick="abortTestProcess()" style="display: none;" data-icon="🛑" data-tooltip="Abort Test Process">Abort Test</button>
+            <button id="scriptTestButton" onclick="scriptTest()" data-icon="📜" data-tooltip="Run Script Mode">Run Script</button>
+        </div>
+        <div class="sidebar-group" id="advanced-group">
+            <div class="group-title">Advanced</div>
+            <button id="resetVenusBtn" onclick="resetVenusDevice()" style="display: none;" data-icon="🔄" data-tooltip="Reset Venus Hardware">
+                RESET Venus
+            </button>
+            <button id="generatePathButton" onclick="generateDataPath()" style="display: none;" data-icon="🛠️" data-tooltip="Generate DataPath via GENS">
+                Generate DataPath
+            </button>
+            <button id="atbConfigButton" onclick="openAtbConfig()" style="display: none;" data-icon="⚙️" data-tooltip="ATB Board Configuration">
+                ATB Board Cfg
+            </button>
+        </div>
+        <div class="sidebar-group" style="background: transparent; border: none; box-shadow: none;">
+            <button onclick="document.getElementById('aboutModal').style.display='flex'" data-icon="ℹ️" data-tooltip="About Application">
+                About
+            </button>
+        </div>
+    </div>
+    <div id="toast">Message Notice</div>
+    <div id="aboutModal" class="modal-overlay" style="display:none;">
+        <div class="modal-content" style="max-width: 500px; text-align: left;">
+            <div class="modal-header">
+                <h3>About Application</h3>
+                <button class="close-btn" onclick="document.getElementById('aboutModal').style.display='none'">×</button>
+            </div>
+            <div style="padding: 15px; font-size: 14px; color: #333; line-height: 1.6;">
+                <p><strong>Product: Device Verification</strong></p>
+                <p>Description: Device Verification Tool</p>
+                <p>File Version: <span id="appVersionDisplay">Loading...</span></p>
+                <p>Copyright © 2026 OmniVision Technologic, Inc.</p>
+                <p>All Rights Reserved.</p>
+                <hr style="margin: 15px 0; border: 0; border-top: 1px solid #eee;">
+                <p><strong>Open Source Licenses</strong></p>
+                <p>This application incorporates software from the following projects:</p>
+                <div style="background: #f8f8f8; padding: 10px; border-radius: 4px; font-size: 12px; border: 1px solid #ddd; margin-bottom: 10px;">
+                    <p><strong>Google Blockly</strong></p>
+                    <p>Copyright © 2026 Google LLC</p>
+                    <p>Licensed under the <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" style="color: #0275d8; text-decoration: none;">Apache License, Version 2.0</a></p>
+                </div>
+                <div style="background: #f8f8f8; padding: 10px; border-radius: 4px; font-size: 12px; border: 1px solid #ddd;">
+                    <p><strong>Mermaid.js</strong></p>
+                    <p>Licensed under the MIT License.</p>
+                </div>
+            </div>
+            <div style="text-align: right; padding: 10px; border-top: 1px solid #eee;">
+                <button onclick="document.getElementById('aboutModal').style.display='none'" 
+                        style="padding: 6px 20px; border-radius: 4px; border: 1px solid #ccc; cursor: pointer; background: #fff;">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+    <script>
+        // ==========================================
+        // 全域變數設定
+        // ==========================================
+        const FILENAME_DEFAULT = "testcase.json"; // 定值
+        let filenameCurrent = null;               // 隨狀態改變
+        let isModified = false;                   // 用來追蹤工作區是否被更動過
+        var GLOBAL_BOARD_ID = 1;                  // 預設為 1 (MCU Board), 2 為 ATB Board
+        // 狀態追蹤變數
+        let isTesting = false;
+        let isSimulationMode = false;             // Simulation mode flag
+        let isDebugMode = false;                  // Debug mode flag, default to false
+        var projectDir = "";                      // Frontend storage for project directory
+        const CONSOLE_HEIGHTS = ['', '50vh', '80vh']; 
+        const CONSOLE_LABELS = ['↕️ Normal', '↕️ Half', '↕️ Large'];
+        let currentConsoleHeightIdx = 0;
+        let lastSidebarWidth = null;              // 記錄左側邊欄最後一次拖拉設定的寬度
+        // 專案相關設定 workspaces 陣列用來儲存多個工作區 每個工作區都是一個物件
+        let project = { 
+            name: 'Untitled Project',
+            workspaces: [
+                { 
+                    id: `ws-${Date.now()}`, 
+                    name: 'Workspace 1', 
+                    path: '', 
+                    selected: true, // 目前正在編輯的
+                    enabled: true,  // 啟用狀態
+                    data: null      // 儲存 Blockly JSON 狀態
+                }
+            ]
+        };
+
+        let testIndex = 1;                        // Current number as test index (counter)
+        let testtotal = testIndex;                // Total number of tests
+        // 輔助用的延遲函數
+        const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        // ==========================================
+        // 取代 alert 的 Toast 通知函式
+        // ==========================================
+        function showToast(message) {
+            var x = document.getElementById("toast");
+            x.innerText = message; // 設定文字
+            x.className = "show";  // 顯示
+            // 3秒後自動消失
+            setTimeout(function(){ 
+                x.className = x.className.replace("show", ""); 
+            }, 3000);
+        }
+
+        // ==========================================
+        // Helper to update projectDir
+        // ==========================================
+        function updateProjectDir(filePath) {
+            if (!filePath) return;
+            const lastSlash = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
+            if (lastSlash !== -1) {
+                projectDir = filePath.substring(0, lastSlash);
+                console.log("Project Dir updated to:", projectDir);
+            }
+        }
+
+        // ==========================================
+        // 根據 isDebugMode 更新 UI 元素的可見性
+        // ==========================================
+        function updateDebugUI() {
+            const mcuBinaryTestBtn = document.getElementById('mcuBinaryTestBtn');
+            const atbBinaryTestBtn = document.getElementById('atbBinaryTestBtn');
+            const projectActionGrid = document.getElementById('projectActionGrid');
+            const displayStyle = isDebugMode ? 'block' : 'none';
+            const isATB = (parseInt(GLOBAL_BOARD_ID, 10) == 2);
+            const boardSelect = document.getElementById('boardSelect');
+            if (projectActionGrid) {
+                // 根據 isDebugMode 狀態切換顯示 'grid' 或 'none'
+                projectActionGrid.style.display = isDebugMode ? 'grid' : 'none';
+            }
+            if (boardSelect) {
+                // 如果是 Debug Mode (true) 則 disabled 為 false (解鎖)
+                // 如果非 Debug Mode (false) 則 disabled 為 true (鎖定)
+                boardSelect.disabled = !isDebugMode; 
+            }
+            // 如果退出 Debug 模式 且目前板子不是 MCU (1) 則強制切回 MCU
+            if (!isDebugMode && parseInt(GLOBAL_BOARD_ID, 10) !== 1) {
+                console.log("Debug mode disabled, auto-switching back to MCU board.");
+                if (boardSelect) boardSelect.value = "1"; // 將下拉選單切換到 MCU
+                // 呼叫既有的切換邏輯 (它會自動處理積木相容性, Baud Rate 變更及按鈕顯示)
+                handleBoardChange(1); 
+                // 因為 handleBoardChange 底層會呼叫 updateBtnVisibility 更新剩下的按鈕 
+                // 所以這裡可以直接 return結束
+                return; 
+            }
+            if (isATB) {
+                if (atbBinaryTestBtn) atbBinaryTestBtn.style.display = displayStyle;
+                // if (mcuBinaryTestBtn) mcuBinaryTestBtn.style.display = 'none';
+            } else {
+                // if (mcuBinaryTestBtn) mcuBinaryTestBtn.style.display = displayStyle;
+                if (atbBinaryTestBtn) atbBinaryTestBtn.style.display = 'none';
+            }
+            console.log(`Debug UI visibility updated. Debug Mode is ${isDebugMode ? 'ON' : 'OFF'}.`);
+        }
+
+        // ==========================================
+        // 統一更新專案狀態與視窗標題
+        // @param {string|null} fileName - 完整路徑或檔名 (null 代表不變)
+        // @param {boolean|null} modifiedStatus - 修改狀態 (null 代表不變)
+        // ==========================================
+        async function updateAppTitle(fileName = null, modifiedStatus = null) {
+            const prevPath = filenameCurrent;
+            const prevStatus = isModified;
+            // 處理檔名與目錄同步
+            if (fileName !== null) {
+                filenameCurrent = fileName;
+            }
+            // 處理修改狀態
+            if (modifiedStatus !== null) {
+                isModified = modifiedStatus;
+            }
+            // 效能優化: 若狀態完全無變動 則跳過後端呼叫
+            if (prevPath === filenameCurrent && prevStatus === isModified) {
+                return;
+            }
+            // 更新 pywebview 視窗標題
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.set_app_title) {
+                const displayTag = isModified ? `*${filenameCurrent}` : filenameCurrent;
+                // 檢查 window.APP_VERSION 是否存在 如果存在就把它黏在 Base Title 後面
+                const versionSuffix = window.APP_VERSION ? ` - v${window.APP_VERSION}` : "";
+                const baseTitle = window.APP_TITLE || "Device Verification Tool";
+                const finalBaseTitle = baseTitle + versionSuffix;
+                // 將組合好的 finalBaseTitle 傳給後端
+                await window.pywebview.api.set_app_title(displayTag, finalBaseTitle);
+            }
+        }
+
+        // ==========================================
+        // 板子切換邏輯
+        // ==========================================
+        function handleBoardChange(arg) {
+            // 取得原始值 (容錯處理)
+            // 如果傳進來的是 HTML 元素 (有 .value 屬性) 就取 .value
+            // 如果傳進來的是直接的值 (字串或數字) 就直接用
+            let rawValue = (arg && arg.value !== undefined) ? arg.value : arg;
+            // 轉成整數 (十進位)
+            const targetValue = parseInt(rawValue, 10);
+            // 檢查轉換結果 如果是 NaN 代表出錯了
+            if (isNaN(targetValue)) {
+                console.error("Board ID 解析失敗 原始值為:", arg);
+                return;
+            }
+            // 直接切換 不再強制清空畫布 (由 index.js 的 validateBlocksOnWorkspace 處理相容性)
+            performSwitch(targetValue);
+        }
+
+        // ==========================================
+        // UI 連動: 根據板子類型 ATB顯示按鈕/非ATB隱藏按鈕 並在切換回非 ATB 模式時 自動關閉視窗
+        // ==========================================
+        async function updateBtnVisibility(boardId) {
+            const genPathBtn = document.getElementById('generatePathButton');
+            const atbCfgBtn = document.getElementById('atbConfigButton');
+            // const mcuBinBtn = document.getElementById('mcuBinaryTestBtn');
+            const atbBinBtn = document.getElementById('atbBinaryTestBtn');
+            const abortBtn = document.getElementById('abortTestBtn');
+            const scriptTestBtn = document.getElementById('scriptTestButton');
+            const isATB = (parseInt(boardId, 10) === 2); 
+            const tyle = isDebugMode ? 'block' : 'none';
+            // 切換板子時 若正在測試中 應維持 Abort 按鈕顯示 否則切換對應 Binary 按鈕
+            if (isATB) {
+                if (genPathBtn) genPathBtn.style.display = 'block';
+                if (atbCfgBtn) atbCfgBtn.style.display = 'block';
+                // if (mcuBinBtn) mcuBinBtn.style.display = 'none';
+                if (scriptTestBtn) scriptTestBtn.style.display = 'none';
+                if (!isTesting) {
+                    if (atbBinBtn) atbBinBtn.style.display = tyle;
+                    if (abortBtn) abortBtn.style.display = 'none';
+                } else {
+                    if (atbBinBtn) atbBinBtn.style.display = 'none';
+                    if (abortBtn) abortBtn.style.display = 'block';
+                }
+            } else {
+                if (genPathBtn) genPathBtn.style.display = 'none';
+                if (atbCfgBtn) atbCfgBtn.style.display = 'none';
+                if (atbBinBtn) atbBinBtn.style.display = 'none';
+                if (!isTesting) {
+                    // if (mcuBinBtn) mcuBinBtn.style.display = tyle;
+                    if (scriptTestBtn) scriptTestBtn.style.display = 'block';
+                    if (abortBtn) abortBtn.style.display = 'none';
+                } else {
+                    // if (mcuBinBtn) mcuBinBtn.style.display = 'none';
+                    if (scriptTestBtn) scriptTestBtn.style.display = 'none';
+                    if (abortBtn) abortBtn.style.display = 'block';
+                }
+            }
+            // 視窗關閉邏輯
+            // 如果切換後的模式 "不是" ATB 且後端 API 存在 則嘗試關閉 GENS 視窗
+            if (!isATB) {
+                if (window.pywebview && window.pywebview.api) {
+                    try {
+                        // 不論視窗有沒有開 呼叫關閉都是安全的 (後端會處理)
+                        await window.pywebview.api.close_gens_window();
+                        await window.pywebview.api.close_atb_config_window()
+                    } catch (e) {
+                        console.error("Failed to close window:", e);
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // 實際執行變數更新與 Log 的函式
+        // ==========================================
+        async function performSwitch(newValue) {
+            GLOBAL_BOARD_ID = newValue;
+            const isValid = update_toolbox(GLOBAL_BOARD_ID);
+            // 自動更新 Baud Rate 預設值
+            const baudSelect = document.getElementById('baudRateSelect');
+            if (baudSelect) {
+                baudSelect.value = "115200";
+                console.log("Default Baud Rate set to 115200.");
+            }
+            if (!isValid) {
+                alert("Warning: Some blocks in the workspace are not compatible with the selected board.");
+            }
+            // 同步更新按鈕顯示狀態
+            updateBtnVisibility(GLOBAL_BOARD_ID);
+        }
+
+        // ==========================================
+        // 實際執行Script測試模式
+        // ==========================================
+        async function scriptTest() {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.script_test_sendfile) {
+                toggleTestUI(true); // 一開始就顯示測試狀態
+                try {
+                    // Generate IR Data
+                    const { flattenedWorkspace, irData } = await generateIR();
+                    if (!irData) throw new Error("Failed to generate IR data.");
+                    // Generate TXT Data (Parse MCU)
+                    let mcu_parse_object = null;
+                    if (window.pywebview.api.Parse_MCU_txt) {
+                        mcu_parse_object = await window.pywebview.api.Parse_MCU_txt(irData, projectDir);
+                    }
+                    if (!mcu_parse_object) throw new Error("Failed to parse MCU TXT.");
+                    testIndex = 1;
+                    testtotal = 1;
+                    // Prepare content and filename
+                    const txtContent = Array.isArray(mcu_parse_object) ? mcu_parse_object.join('\n') : mcu_parse_object;
+                    let fileNameOnly = filenameCurrent.split(/[/\\]/).pop(); // 確保只取檔名部分
+                    const scripts_datas = [{ name: `${fileNameOnly} (Workspace)`, content: txtContent }];
+                    // 等待並擷取當下畫面的圖片 Base64
+                    const workspaceImageBase64 = await getWorkspaceImageBase64();
+                    const result = await window.pywebview.api.script_test_sendfile(projectDir, workspaceImageBase64, scripts_datas, testIndex, testtotal);
+                    if (result == 0) {
+                        showToast("Script Test Started...");
+                    } else {
+                        if (result == 1) {
+                            showToast("Another test is already running.");
+                        } else if (result == -1) { // -1 代表取消
+                            showToast("Script test cancelled.");
+                        } else { // 例如 -2 代表後端啟動失敗
+                            showToast("Error: Failed to start test. Check device connection.");
+                        }
+                        toggleTestUI(false); // 啟動失敗或取消 恢復 UI
+                    }
+                } catch (error) {
+                    console.error("scriptTest Error:", error);
+                    showToast(`Error: ${error.message || "Communication failed"}`);
+                    toggleTestUI(false);
+                }
+            }
+        }
+
+        // ==========================================
+        // 切換測試中與閒置狀態的 UI 按鈕
+        // ==========================================
+        function toggleTestUI(testing) {
+            isTesting = testing;
+            updateBtnVisibility(GLOBAL_BOARD_ID);
+            if (isTesting) {
+                updateStatusLed('yellow', true);
+            } else {
+                updateStatusLed('green', false);
+            }
+        }
+
+        // ==========================================
+        // 執行 MCU 模式下的 Binary 測試
+        // ==========================================
+        async function binaryTestMCU() {
+            if (window.pywebview && window.pywebview.api) {
+                toggleTestUI(true);
+                // 實作狀態檢查流程
+                try {
+                    await window.pywebview.api.start_serial_logging();
+                    const status = await window.pywebview.api.check_mcu_status();
+                    if (status == 0) {
+                        showToast("MCU Binary Test Started...");
+                        await window.pywebview.api.stop_serial_logging();
+                        const workspaceState = Blockly.serialization.workspaces.save(workspace);
+                        const blockly_customer = return_dynamic_block();
+                        testIndex = 1;
+                        testtotal = 1;
+                        // 取得扁平化後的指令集
+                        const { flattenedWorkspace, irData } = await generateIR();
+                        const binaryJsonData = await generateBinaryJsonData(irData);
+                        // 等待並擷取當下畫面的圖片 Base64
+                        const workspaceImageBase64 = await getWorkspaceImageBase64();
+                        // 組合自定義的資料結構
+                        const finalState = {
+                            // 在最前面插入GUI模塊的相關設定
+                            gui: {
+                                GLOBAL_BOARD_ID: GLOBAL_BOARD_ID,
+                                testIndex: testIndex,
+                                testtotal: testtotal,
+                                projectDir: projectDir
+                            },
+                            customer_blockly:{
+                                ...blockly_customer
+                            },
+                            // 將圖片字串放入 JSON 架構中
+                            workspace_image: workspaceImageBase64,
+                            // 將 Blockly 的原始資料展開接在後面
+                            ...workspaceState,
+                            // 若有扁平化資料 也一併帶入 (通常執行測試需要 IR)
+                            ir_data: irData || {},
+                            binary_json: binaryJsonData ||{}
+                        };
+                        // 呼叫實際測試 API
+                        ret = await window.pywebview.api.start_mcu_binary_test(finalState);
+                        if (ret != 0){
+                            showToast("Start Thread Test Fail");
+                            toggleTestUI(false);
+                        }
+                    } else if (status == 1) {
+                        showToast("MCU is busy, switching to Abort mode.");
+                    } else if (status == -1) {
+                        showToast("MCU board not found.");
+                        await window.pywebview.api.stop_serial_logging();
+                        toggleTestUI(false);
+                    }
+                } catch (error) {
+                    // 當後端 API 不存在時的處理
+                    console.error("API check_mcu_status is not defined yet:", error);
+                    showToast("Backend API not found....");
+                    toggleTestUI(false);
+                }
+            }
+        }
+
+        // ==========================================
+        // 執行 ATB 模式下的 Binary 測試
+        // ==========================================
+        async function binaryTestATB() {
+            if (window.pywebview && window.pywebview.api) {
+                toggleTestUI(true);
+                // 實作狀態檢查流程
+                try {
+                    await window.pywebview.api.start_serial_logging();
+                    const status = await window.pywebview.api.check_atb_status();
+                    if (status == 0) {
+                        showToast("ATB Binary Test Started...");
+                        await window.pywebview.api.stop_serial_logging();
+                        const workspaceState = Blockly.serialization.workspaces.save(workspace);
+                        const blockly_customer = return_dynamic_block();
+                        testIndex = 1;
+                        testtotal = 1;
+                        // 取得扁平化後的指令集
+                        const { flattenedWorkspace, irData } = await generateIR();
+                        const binaryJsonData = await generateBinaryJsonData(irData);
+                        // 等待並擷取當下畫面的圖片 Base64
+                        const workspaceImageBase64 = await getWorkspaceImageBase64();
+                        saveFile(binaryJsonData, "test_atbjson.json")
+                        // 組合自定義的資料結構
+                        const finalState = {
+                            // 在最前面插入GUI模塊的相關設定
+                            gui: {
+                                GLOBAL_BOARD_ID: GLOBAL_BOARD_ID,
+                                testIndex: testIndex,
+                                testtotal: testtotal,
+                                projectDir: projectDir
+                            },
+                            customer_blockly:{
+                                ...blockly_customer
+                            },
+                            // 將圖片字串放入 JSON 架構中
+                            workspace_image: workspaceImageBase64,
+                            // 將 Blockly 的原始資料展開接在後面
+                            ...workspaceState,
+                            // 若有扁平化資料 也一併帶入 (通常執行測試需要 IR)
+                            ir_data: irData || {},
+                            binary_json: binaryJsonData || {}
+                        };
+                        // 呼叫實際測試 API
+                        ret = await window.pywebview.api.start_atb_binary_test(finalState);
+                        if (ret != 0){
+                            showToast("Start Thread Test Fail");
+                            toggleTestUI(false);
+                        }
+                    } else if (status == 1) {
+                        showToast("ATB is busy, switching to Abort mode.");
+                    } else if (status == -1) {
+                        showToast("ATB board not found.");
+                        await window.pywebview.api.stop_serial_logging();
+                        toggleTestUI(false);
+                    }
+                } catch (error) {
+                    // 當後端 API 不存在時的處理
+                    console.error("BinaryTestATB Error Details:", error); 
+                    showToast(`Error: ${error.message || "Communication failed"}`);
+                    toggleTestUI(false);
+                }
+            }
+        }
+
+        // ==========================================
+        // 中止測試流程
+        // ==========================================
+        async function abortTestProcess() {
+            console.log("Aborting test process...");
+            if (window.pywebview && window.pywebview.api) {
+                const btn = document.getElementById('abortTestBtn');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerText = "Aborting...";
+                }
+                try {
+                    // 呼叫後端中止指令
+                    await window.pywebview.api.stop_test_process();
+                    showToast("Test Aborted.");
+                } catch (e) {
+                    // 當後端 API 不存在時的處理
+                    console.error("API check_mcu_status is not defined yet:", e);
+                    showToast("Backend API not found....");
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerText = "Abort Test";
+                    }
+                    // 模擬成功流程 測試前端 UI 切換
+                    // toggleTestUI(false);
+                }
+            }
+        }
+
+        // ==========================================
+        // 更新狀態燈號
+        // @param {string} color - 'orange', 'green', 'yellow'
+        // @param {boolean} isBlinking - 是否閃爍
+        // ==========================================
+        function updateStatusLed(color, isBlinking = false) {
+            const led = document.getElementById('statusLed');
+            if (!led) return;
+            // 先移除所有狀態類名
+            led.className = 'status-indicator';
+            // 加入顏色類名
+            led.classList.add(`led-${color}`);
+            // 加入閃爍類名
+            if (isBlinking) {
+                led.classList.add('blink');
+            }
+        }
+
+        // ==========================================
+        // 產生 IR 資料 (獨立函式以供重複使用)
+        // ==========================================
+        async function generateIR() {
+            let flattenedWorkspace = null;
+            let irData = null;
+            try {
+                if (typeof flattenWorkspace === 'function') {
+                    flattenedWorkspace = flattenWorkspace();
+                    try {
+                        irData = IR_generator(flattenedWorkspace);
+                    } catch (e) {
+                        console.error("JSON_OUT generation failed:", e);
+                        showToast("Warning: JSON_OUT generation failed.");
+                    }
+                }
+            } catch (e) {
+                console.error("Flattening failed:", e);
+                showToast("Warning: Flattening failed, saving project only.");
+            }
+            return { flattenedWorkspace, irData };
+        }
+
+        // ==========================================
+        // 呼叫外部模組將 IR 資料轉換為 Binary JSON 格式
+        // @param {Object} irData - 從 Blockly 產生的 IR JSON 資料
+        // @returns {Object|null} - 轉換後的 Binary JSON 失敗則回傳 null
+        // ==========================================
+        function generateBinaryJsonData(irData) {
+            if (!irData) {
+                console.warn("generateBinaryJsonData: irData is empty.");
+                return null;
+            }
+            if (typeof window.IRtobinjson_process === 'function') {
+                try {
+                    const binJsonResult = window.IRtobinjson_process(irData);
+                    console.log("Binary JSON generated successfully.");
+                    return binJsonResult;
+                } catch (err) {
+                    console.error("Error generating Binary JSON:", err);
+                    return null;
+                }
+            } else {
+                console.error("Function IRtobinjson_process is not defined. Please check binmode_json.js");
+                return null;
+            }
+        }
+
+        // ==========================================
+        // 產生 ATB Board Configure 邏輯
+        // ==========================================
+        async function openAtbConfig() {
+            const btn = document.getElementById('atbConfigButton');
+            if (!btn) return;
+            const originalText = "ATB Board Cfg";
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.open_atb_config_window) {
+                try {
+                    // 禁用按鈕並更換文字
+                    btn.disabled = true;
+                    btn.innerText = "ATB is configuring...";
+                    showToast('Opening ATB Board Configuration...');
+                    const result = await window.pywebview.api.open_atb_config_window();
+                    if (result !== 0) {
+                        console.error("Failed to open ATB Config window, result:", result);
+                        btn.disabled = false;
+                        btn.innerText = originalText;
+                    }
+                } catch (error) {
+                    console.error(error);
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                }
+            } else {
+                console.warn("Python API not available.");
+            }
+        }
+
+        // ==========================================
+        // 產生 DataPath 邏輯
+        // ==========================================
+        async function generateDataPath() {
+            const btn = document.getElementById('generatePathButton'); 
+            if (!btn) return;
+            const originalText = btn.innerText;
+            if (window.pywebview && window.pywebview.api) {
+                try {
+                    // 禁用按鈕並更換文字
+                    btn.disabled = true;
+                    btn.innerText = "DataPath Generating...";
+                    showToast('Initializing GENS Application...');
+                    // 呼叫 Python
+                    const result = await window.pywebview.api.open_gens_window();
+                    if (result === "GENS_ALREADY_RUNNING") {
+                        showToast("GENS is already running.");
+                        // 如果已經在跑 不需要恢復 因為按鈕本來就該是 disabled 或由後端事件控制
+                    }
+                    console.log("GENS Status:", result);
+                } catch (error) {
+                    showToast("Failed to open GENS");
+                    console.error(error);
+                    // 發生錯誤時恢復按鈕
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                }
+            } else {
+                showToast("Browser mode: GENS is not available.");
+            }
+        }
+
+        // ==========================================
+        // 檔案存檔: 瀏覽器備用方案 (Browser Fallback)
+        // ==========================================
+        async function saveFileAsDialogBrowser(content, mimeType, filename, extension) {
+            const fallbackDesc = extension ? `${extension.slice(1).toUpperCase()} File` : 'File';
+            console.warn(`Backend not found. Falling back to browser download for ${fallbackDesc}.`);
+            const blob = new Blob([content], { type: mimeType });
+            try {
+                if (window.showSaveFilePicker) {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: filename.endsWith(extension) ? filename : filename + extension,
+                        types: [{
+                            description: fallbackDesc,
+                            accept: { [mimeType]: [extension] },
+                        }],
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                    return handle.name;
+                } else {
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = filename;
+                    a.click();
+                    return filename;
+                }
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    throw new Error(`Browser Save-As failed: ${err.message || err}`);
+                }
+                return null;
+            }
+        }
+
+        // ==========================================
+        // 檔案存檔: 後端靜默儲存方案
+        // @param {string} content - 存檔內容
+        // @param {string} filename - 檔名
+        // @param {string} directory - 目錄
+        // ==========================================
+        async function saveFileDirectBackend(content, filename, directory) {
+            if (window.pywebview && window.pywebview.api) {
+                try {
+                    let savedPath = null;
+                    const filenameOnly = filename.split(/[/\\]/).pop();
+                    if (window.pywebview.api.save_file_direct) {
+                        savedPath = await window.pywebview.api.save_file_direct(filenameOnly, directory, content);
+                    }
+                    if (savedPath === null) {
+                        throw new Error(`Backend silent save returned null.`);
+                    }
+                    return savedPath;
+                } catch (e) {
+                    throw new Error(`Backend Direct Save failed: ${e.message || e}`);
+                }
+            }
+            return undefined; // 代表後端 API 不可用
+        }
+
+        // ==========================================
+        // 檔案存檔: 彈出對話框方案 (對應後端 save_file_as_dialog)
+        // ==========================================
+        async function saveFileAsDialogBackend(content, filename, directory, fileTypes = null) {
+            if (window.pywebview && window.pywebview.api) {
+                try {
+                    let savedPath = null;
+                    const filenameOnly = filename.split(/[/\\]/).pop();
+                    // 呼叫對話框存檔 API
+                    if (window.pywebview.api.save_file_as_dialog) {
+                        // 如果沒傳 fileTypes 至少給一個預設的 tuple 格式  (Python 需要 tuple) 
+                        const types = fileTypes || ['All files (*.*)'];
+                        savedPath = await window.pywebview.api.save_file_as_dialog(filenameOnly, directory, content, types);
+                    }
+                    return savedPath;
+                } catch (e) {
+                    throw new Error(`Backend Save-As failed: ${e.message || e}`);
+                }
+            }
+            return undefined; // 代表後端 API 不可用
+        }
+
+        // ==========================================
+        // 存檔調度中心 (分流處理後端與瀏覽器方案)
+        // ==========================================
+        async function saveFile(rawContent, filename, forceDialog = false) {
+            let finalContent;
+            let mimeType;
+            let extension;
+            let autoFileTypes = ['All files (*.*)'];
+            const lowerName = filename.toLowerCase();
+            if (lowerName.endsWith('.json')) {
+                // 如果是 JSON 進行字串化
+                finalContent = JSON.stringify(rawContent, null, 2);
+                mimeType = 'application/json';
+                extension = '.json';
+                autoFileTypes = ['JSON Files (*.json)', 'All files (*.*)'];
+            } else if (lowerName.endsWith('.txt')) {
+                // 如果是 TXT 或其他 直接合併陣列  (假設 content 是陣列) 
+                finalContent = Array.isArray(rawContent) ? rawContent.join('\n') : rawContent;
+                mimeType = 'text/plain';
+                extension = '.txt';
+                autoFileTypes = ['Text Files (*.txt)', 'All files (*.*)'];
+            } else {
+                // 未知格式立即中斷 不給予任何預設值
+                throw new Error(`Unsupported file extension in "${filename}". Only .json and .txt are allowed.`);
+            }
+            // 嘗試使用後端方案
+            let backendResult;
+            if (forceDialog) {
+                backendResult = await saveFileAsDialogBackend(finalContent, filename, projectDir, autoFileTypes);
+            } else {
+                backendResult = await saveFileDirectBackend(finalContent, filename, projectDir);
+            }
+            if (backendResult !== undefined) {
+                return backendResult;
+            }
+            // 如果後端不可用 使用瀏覽器 Fallback 方案
+            return await saveFileAsDialogBrowser(finalContent, mimeType, filename, extension);
+        }
+
+        // ==========================================
+        // 輔助函式: 生成派生路徑 (如 _IR.json)
+        // ==========================================
+        function getDerivedPath(basePath, suffix, ext = '.json') {
+            const base = basePath.toLowerCase().endsWith('.json') ? basePath.slice(0, -5) : basePath;
+            return base + suffix + ext;
+        }
+
+        // ==========================================
+        // 核心優化: 統一封裝存檔格式 (純函式版)
+        // @param {Object} content - 要存檔的核心積木內容
+        // @param {number} boardId - 板子 ID
+        // @param {Object} customerBlockly - 自定義積木定義
+        // @returns {Object} 封裝後的標準存檔格式
+        // ==========================================
+        function buildStorageFormat(content, boardId, customerBlockly) {
+            return {
+                // 在最前面插入GUI模塊的相關設定
+                gui: {
+                    GLOBAL_BOARD_ID: boardId
+                },
+                customer_blockly: customerBlockly,
+                // 將 Blockly 的原始資料展開接在後面
+                ...content
+            };
+        }
+
+        // ==========================================
+        // TestCase 檔案操作 (JSON 序列化)
+        // 儲存按鈕 點擊事件
+        // ==========================================
+        // ==========================================
+        // 序列化工作區或指定內容 並封裝為標準存檔格式
+        // @param {Object} [targetContent=null] - 外部傳入的積木資料 若為 null 則抓取當前 workspace 並驗證
+        // ==========================================
+        function serializeWorkspace(targetContent = null) {
+            try {
+                // 只要外面有傳進來 就不執行驗證判斷
+                if (targetContent !== null) {
+                    return buildStorageFormat(targetContent, GLOBAL_BOARD_ID, return_dynamic_block());
+                }
+                if (!workspace) throw new Error("Workspace is not initialized.");
+                // Validate blocks before saving
+                if (typeof validateBlocksOnWorkspace === 'function') {
+                    if (!validateBlocksOnWorkspace()) {
+                        if (!confirm("Warning: Invalid blocks detected in the current workspace.\nDo you want to continue?")) {
+                            return null;
+                        }
+                    }
+                }
+                const blocklyState = Blockly.serialization.workspaces.save(workspace);
+                return buildStorageFormat(blocklyState, GLOBAL_BOARD_ID, return_dynamic_block());
+            } catch (e) {
+                showToast(e.message);
+                return null;
+            }
+        }
+
+        async function persistWorkspaceData(packedWorkspace, filename) {
+            try {
+                // 執行存檔流程 (強制顯示對話框)
+                const savedPath = await saveFile(packedWorkspace, filename, true);
+                if (!savedPath) {
+                    return null; // User cancelled
+                }
+                // Update projectDir
+                updateProjectDir(savedPath);
+                // 更新全域檔名與標題
+                await updateAppTitle(savedPath, false);
+                // 取得派生路徑
+                const normalizeName = getDerivedPath(savedPath, '_normalize');
+                const IRname        = getDerivedPath(savedPath, '_IR');
+                const Parsetxtname  = getDerivedPath(savedPath, '_parse_mcu', '.txt');
+                // 取得扁平化資料以產生衍生檔案
+                const { flattenedWorkspace, irData } = await generateIR();
+                if (!flattenedWorkspace || !irData) {
+                    throw new Error("Failed to generate IR data or flattened workspace.");
+                }
+                if (isDebugMode) {
+                    // 存 Normalize File and IR File
+                    const normalizeState = serializeWorkspace(flattenedWorkspace);
+                    await saveFile(normalizeState, normalizeName);
+                    await saveFile(irData, IRname);
+                }
+                // Parse IR file to MCU TXT
+                if (window.pywebview && window.pywebview.api && window.pywebview.api.Parse_MCU_txt) {
+                    try {
+                        const mcu_parse_object = await window.pywebview.api.Parse_MCU_txt(irData, projectDir);
+                        if (mcu_parse_object) {
+                            await saveFile(mcu_parse_object, Parsetxtname);
+                        }
+                    } catch (e) {
+                        throw new Error(`Parse_MCU_txt failed: ${e.message || e}`);
+                    }
+                }
+                if (!isDebugMode) {
+                    // 如果不是除錯模式 顯示訊息
+                    showToast("Project saved successfully!");
+                } else {
+                    showToast("Project and debug files saved successfully!");
+                }
+                return savedPath;
+            } catch (error) {
+                console.error("persistWorkspaceData Error:", error);
+                showToast(error.message);
+                return null;
+            }
+        }
+
+        // ==========================================
+        // 匯出指定的單個工作區為獨立的 JSON 檔案
+        // @param {number} index - 工作區索引
+        // ==========================================
+        async function exportWorkspace(index) {
+            const ws = project.workspaces[index];
+            if (!ws) return;
+            let dataToSave = ws.data;
+            // 如果是目前正在編輯的工作區 先從畫布抓取最新狀態
+            if (ws.selected && workspace) {
+                dataToSave = serializeWorkspace();
+            }
+            if (!dataToSave) {
+                showToast("Workspace is empty or data not found.");
+                return;
+            }
+            // 執行存檔 (Dialog -> Save -> IR -> MCU TXT)
+            // 檔名預設為 "工作區名稱.json"
+            const filename = (ws.name || "workspace").replace(/ /g, '_') + ".json";
+            await persistWorkspaceData(dataToSave, filename);
+        }
+
+        // ==========================================
+        // 將執行區域的 UI 重置回初始狀態
+        // ==========================================
+        function resetExecutionUI() {
+            const boardSelect = document.getElementById('boardSelect');
+            // 解鎖板子選擇下拉選單
+            if (boardSelect) {
+                boardSelect.disabled = false;
+            }
+            // 重置燈號為 IDLE (橘燈)
+            updateStatusLed('orange', false);
+        }
+
+        // ==========================================
+        // 清除按鈕 點擊事件
+        // ==========================================
+        function cleanTestCase() {
+            // 停止事件觸發
+            Blockly.Events.disable();
+            workspace.clear();
+            // 恢復事件觸發
+            Blockly.Events.enable();
+            // 手動重置標題
+            updateAppTitle(null, true);
+            resetExecutionUI();
+            showToast("TestCase cleaned.");
+        }
+
+        // ==========================================
+        // 匯入單個工作區按鈕 點擊事件
+        // ==========================================
+        async function importWorkspace() {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.load_file_dialog) {
+                try {
+                    const fileTypes = ['JSON Files (*.json)', 'All files (*.*)'];
+                    const result = await window.pywebview.api.load_file_dialog(projectDir, fileTypes);
+                    if (result) {
+                        processImportedWorkspaceContent(result.content, result.filename);
+                        updateProjectDir(result.filename);
+                        updateAppTitle(result.filename, false);
+                        return;
+                    }
+                    return;
+                } catch (e) {
+                    console.warn("Backend import failed:", e);
+                }
+            }
+            // Fallback: 使用隱藏的 Input
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (rev) => processImportedWorkspaceContent(rev.target.result, file.name);
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+
+        // ==========================================
+        // 處理匯入的工作區內容
+        // ==========================================
+        function processImportedWorkspaceContent(content, filename) {
+            try {
+                const state = JSON.parse(content);
+                const nameOnly = filename.split(/[/\\]/).pop().replace(/\.json$/i, '');
+                // 建立新的工作區物件
+                const newWs = {
+                    id: `ws-${Date.now()}`,
+                    name: nameOnly,
+                    path: filename,
+                    selected: false,
+                    enabled: true,
+                    // 儲存完整狀態 之後由 setActiveWorkspace 執行載入與檢查流程
+                    data: state 
+                };
+                project.workspaces.push(newWs);
+                renderWorkspaceList();
+                // 核心行為複用: 直接切換到該工作區 這會自動觸發完整的加載, 板子切換與檢查流程
+                setActiveWorkspace(project.workspaces.length - 1);
+                showToast(`Imported workspace: ${nameOnly}`);
+            } catch (err) {
+                console.error("Import Error:", err);
+                showToast("Error: Invalid workspace format.");
+            }
+        }
+
+        // ==========================================
+        // 將 JSON 狀態套用到當前的 Blockly 畫布上 (包含板子切換與相容性檢查)
+        // @param {Object|string} stateData - 積木狀態 (可以是 JSON 字串或物件)
+        // @param {string} filename - 關聯的檔案名稱/路徑
+        // ==========================================
+        async function applyWorkspaceState(stateData, filename) {
+            try {
+                if (!workspace) return;
+                const state = typeof stateData === 'string' ? JSON.parse(stateData) : stateData;
+                // 同步板子設定 (Board ID) 與 UI 連動
+                if (state.gui && state.gui.GLOBAL_BOARD_ID !== undefined) {
+                    // 更新全域變數
+                    performSwitch(state.gui.GLOBAL_BOARD_ID);
+                    // 更新 UI 下拉選單 (轉成字串以匹配 value)
+                    const select = document.getElementById('boardSelect');
+                    if (select) {
+                        select.value = String(GLOBAL_BOARD_ID);
+                    }
+                    // 重置燈號為 IDLE (橘燈)
+                    updateStatusLed('orange', false);
+                }
+                // 還原 Blockly 積木
+                // 停止事件觸發
+                Blockly.Events.disable();
+                workspace.clear();
+                if (state.customer_blockly) {
+                    update_dynamic_toolbox(state.customer_blockly);
+                }
+                // Blockly 很聰明 它讀取 state 時會自動忽略看不懂的 key (例如 'gui')
+                // 所以直接把整個 state 丟給它也沒問題
+                Blockly.serialization.workspaces.load(state, workspace);
+                workspace.scrollCenter();
+                // 恢復事件觸發
+                Blockly.Events.enable();
+                // 檢查積木相容性
+                if (typeof validateBlocksOnWorkspace === 'function') {
+                    if (!validateBlocksOnWorkspace()) {
+                        if (!confirm("Warning: The loaded project contains blocks incompatible with the current board.\nDo you want to keep it?")) {
+                            cleanTestCase(); // 使用者選擇不保留 則清空
+                            return;
+                        }
+                    }
+                }
+                showToast("TestCase Loaded Successfully!");
+            } catch (err) {
+                console.error("Apply State Error:", err);
+                showToast("Error: Failed to apply workspace state.");
+            }
+        }
+
+        // ==========================================
+        // 平滑重繪 Blockly 畫布 (用於動畫)
+        // ==========================================
+        function smoothResizeBlockly() {
+            // 確保 workspace 物件存在
+            if (typeof workspace === 'undefined' || !workspace) return;
+            const duration = 300; // 必須與 CSS 的 transition-duration (0.3s) 一致
+            const start = performance.now();
+            function animate(time) {
+                const elapsed = time - start;
+                // 在動畫的每一幀都觸發 resize
+                window.dispatchEvent(new Event('resize'));
+                // 如果動畫尚未結束 繼續請求下一幀
+                if (elapsed < duration) {
+                    requestAnimationFrame(animate);
+                }
+            }
+            // 啟動動畫
+            requestAnimationFrame(animate);
+        }
+
+        // ==========================================
+        // Project & Workspace 管理邏輯
+        // ==========================================
+        // ==========================================
+        // 重新渲染左側側邊欄的 Workspace 列表
+        // ==========================================
+        function renderWorkspaceList() {
+            const listContainer = document.getElementById('workspaceList');
+            if (!listContainer) return;
+            listContainer.innerHTML = '';
+            project.workspaces.forEach((ws, index) => {
+                const item = document.createElement('div');
+                // 使用 selected 判斷是否為 active (當前編輯項) 使用 enabled 判斷是否 disabled (置灰)
+                item.className = `workspace-item ${ws.selected ? 'active' : ''} ${ws.enabled ? '' : 'disabled'}`;
+                item.onclick = () => setActiveWorkspace(index);
+                item.title = ws.name; // 在容器上顯示完整名稱提示
+                // --- 拖拉換位邏輯 ---
+                item.draggable = true;
+                item.ondragstart = (e) => {
+                    e.dataTransfer.setData('text/plain', index);
+                    item.classList.add('dragging');
+                };
+                item.ondragend = () => {
+                    item.classList.remove('dragging');
+                    document.querySelectorAll('.workspace-item').forEach(el => {
+                        el.classList.remove('drag-over-top', 'drag-over-bottom');
+                    });
+                };
+                item.ondragover = (e) => {
+                    e.preventDefault(); 
+                    const rect = item.getBoundingClientRect();
+                    const relY = e.clientY - rect.top;
+                    // 二分法偵測: 上半部顯示上方線 下半部顯示下方線
+                    if (relY < rect.height / 2) {
+                        item.classList.add('drag-over-top');
+                        item.classList.remove('drag-over-bottom');
+                    } else {
+                        item.classList.add('drag-over-bottom');
+                        item.classList.remove('drag-over-top');
+                    }
+                };
+                item.ondragleave = () => {
+                    item.classList.remove('drag-over-top', 'drag-over-bottom');
+                };
+                item.ondrop = (e) => {
+                    e.preventDefault();
+                    const fromIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                    const rect = item.getBoundingClientRect();
+                    const relY = e.clientY - rect.top;
+                    // 如果在下半部放下 目標索引應 +1 (即插入到該項之後)
+                    let toIndex = index;
+                    if (relY >= rect.height / 2) {
+                        toIndex++;
+                    }
+                    handleWorkspaceReorder(fromIndex, toIndex);
+                };
+                // Grip 手柄 (Figma 風格)
+                const grip = document.createElement('div');
+                grip.className = 'drag-handle';
+                grip.innerHTML = '⋮⋮'; 
+                item.appendChild(grip);
+                // --- 獨立啟用/停用勾選框 ---
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'ws-checkbox';
+                checkbox.checked = (ws.enabled !== false); // 預設為 true
+                checkbox.title = ws.enabled ? 'Disable Workspace' : 'Enable Workspace';
+                checkbox.onclick = (e) => {
+                    e.stopPropagation(); // 防止觸發切換工作區
+                    toggleWorkspaceEnabled(index);
+                };
+                item.appendChild(checkbox);
+                // 名稱編輯輸入框 (原地編輯)
+                const nameInput = document.createElement('input');
+                nameInput.type = 'text';
+                nameInput.className = 'workspace-name-input';
+                nameInput.value = ws.name;
+                nameInput.title = ws.name; // 顯示完整名稱提示
+                // 初始狀態設定
+                nameInput.readOnly = true; 
+                // 點擊邏輯
+                nameInput.onclick = (e) => {
+                    // 只要該項目是 Active 狀態 點擊都開啟編輯
+                    if (ws.selected) {
+                        e.stopPropagation();
+                        if (nameInput.readOnly) {
+                            nameInput.readOnly = false;
+                            nameInput.focus();
+                            nameInput.select();
+                        }
+                    }
+                };
+                // UX 邏輯: 如果是預設名稱 聚焦時清空
+                nameInput.onfocus = function() {
+                    const regex = /^Workspace\s+\d+$/;
+                    if (regex.test(this.value)) {
+                        this.dataset.oldValue = this.value; // 暫存舊值
+                        this.value = '';
+                    }
+                };
+                // UX 邏輯: 如果清空後離開 補回舊值
+                nameInput.onblur = function() {
+                    if (this.value.trim() === '') {
+                        this.value = this.dataset.oldValue || ws.name;
+                    }
+                    renameWorkspace(index, this.value);
+                };
+                // 按下 Enter 鍵結束編輯
+                nameInput.onkeydown = function(e) {
+                    if (e.key === 'Enter') {
+                        this.blur();
+                    }
+                };
+                nameInput.onchange = function() {
+                    renameWorkspace(index, this.value);
+                };
+                item.appendChild(nameInput);
+                // 操作按鈕容器
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'ws-item-actions';
+                // 導出按鈕 (Export)
+                const exportBtn = document.createElement('button');
+                exportBtn.className = 'ws-item-btn';
+                exportBtn.title = 'Export Workspace';
+                exportBtn.innerHTML = '💾'; // 未來可換成 SVG
+                exportBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    exportWorkspace(index);
+                };
+                actionsDiv.appendChild(exportBtn);
+                // 刪除按鈕 (Delete)
+                if (project.workspaces.length > 1) {
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'ws-item-btn';
+                    deleteBtn.title = 'Delete Workspace';
+                    deleteBtn.innerHTML = '🗑️'; // 未來可換成 SVG
+                    deleteBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        deleteWorkspace(index);
+                    };
+                    actionsDiv.appendChild(deleteBtn);
+                }
+                item.appendChild(actionsDiv);
+                listContainer.appendChild(item);
+            });
+            // 同步專案名稱輸入框
+            const projectNameInput = document.getElementById('projectNameInput');
+            if (projectNameInput) {
+                projectNameInput.value = project.name || 'Untitled Project';
+            }
+            // 更新統計資訊
+            const statsContainer = document.getElementById('projectStats');
+            if (statsContainer) {
+                statsContainer.innerText = `Total: ${project.workspaces.length} Workspace(s)`;
+            }
+        }
+
+        // ==========================================
+        // 處理工作區重新排序 (精確插入邏輯)
+        // ==========================================
+        function handleWorkspaceReorder(fromIndex, toIndex) {
+            // 如果來源等於目標 或目標就在來源之後  (這是不變的位移)  則不處理
+            if (fromIndex === toIndex || fromIndex === toIndex - 1) return;
+            // 先備份要移動的項目
+            const movedItem = project.workspaces[fromIndex];
+            // 從原位置刪除
+            project.workspaces.splice(fromIndex, 1);
+            // 計算插入位置: 如果我們是向下移動 因為已經刪除了 fromIndex 
+            // 剩餘項目的索引會往前移 所以 toIndex 需要減 1
+            let finalInsertIndex = toIndex;
+            if (fromIndex < toIndex) {
+                finalInsertIndex--;
+            }
+            // 插入到新位置
+            project.workspaces.splice(finalInsertIndex, 0, movedItem);
+            console.log(`Reordered workspace: from ${fromIndex} to ${finalInsertIndex}`);
+            renderWorkspaceList();
+            showToast("Workspace reordered");
+        }
+
+        // ==========================================
+        // 切換當前活動的工作區
+        // ==========================================
+        function setActiveWorkspace(index) {
+            const targetWs = project.workspaces[index];
+            if (!targetWs) return;
+            // 保存當前工作區積木到記憶體
+            if (workspace) {
+                const currentActiveIndex = project.workspaces.findIndex(ws => ws.selected);
+                if (currentActiveIndex !== -1 && currentActiveIndex !== index) {
+                    const blocklyState = Blockly.serialization.workspaces.save(workspace);
+                    project.workspaces[currentActiveIndex].data = serializeWorkspace(blocklyState);
+                    console.log(`Saved previous workspace [${project.workspaces[currentActiveIndex].name}] data.`);
+                }
+            }
+            project.workspaces.forEach((ws, i) => {
+                ws.selected = (i === index);
+            });
+            console.log(`Switched to workspace: ${targetWs.name}`);
+            // 直接更新現有 DOM 狀態而不觸發全重繪 減少閃爍
+            const items = document.querySelectorAll('.workspace-item');
+            if (items.length === project.workspaces.length) {
+                items.forEach((item, i) => {
+                    const ws = project.workspaces[i];
+                    const nameInput = item.querySelector('.workspace-name-input');
+                    const checkbox = item.querySelector('.ws-checkbox');
+                    // 更新選中狀態
+                    if (ws.selected) {
+                        item.classList.add('active');
+                    } else {
+                        item.classList.remove('active');
+                    }
+                    // 更新啟用狀態樣式
+                    if (ws.enabled) {
+                        item.classList.remove('disabled');
+                    } else {
+                        item.classList.add('disabled');
+                    }
+                    // 更新輸入框屬性 (精確同步)
+                    if (nameInput) {
+                        // 每次切換 不論切到誰 都先讓它恢復「唯讀」狀態
+                        nameInput.readOnly = true;
+                    }
+                    // 同步勾選框狀態
+                    if (checkbox) {
+                        checkbox.checked = (ws.enabled !== false);
+                    }
+                });
+            } else {
+                // 如果數量不對  (例如剛刪除或新增)  才執行全量重繪
+                renderWorkspaceList();
+            }
+            // 執行完整的加載, 板子切換與檢查流程
+            if (targetWs.data) {
+                applyWorkspaceState(targetWs.data, targetWs.path);
+            } else {
+                // 如果是全新工作區 (data 為 null) 則僅清空畫布
+                cleanTestCase();
+            }
+        }
+
+        // ==========================================
+        // 建立新的工作區
+        // ==========================================
+        function createNewWorkspace() {
+            // 找出目前所有工作區名稱中 符合 "Workspace X" 格式的最大數字
+            let maxNum = 0;
+            const regex = /^Workspace\s+(\d+)$/;
+            project.workspaces.forEach(ws => {
+                const match = ws.name.match(regex);
+                if (match) {
+                    const num = parseInt(match[1], 10);
+                    if (num > maxNum) maxNum = num;
+                }
+            });
+            // 從最大數字 + 1 開始
+            const newName = `Workspace ${maxNum + 1}`;
+            const newWs = {
+                id: `ws-${Date.now()}`,
+                name: newName,
+                path: '',
+                selected: false,
+                enabled: true,
+                data: null
+            };
+            project.workspaces.push(newWs);
+            renderWorkspaceList(); // 新增項目 需要重繪
+            setActiveWorkspace(project.workspaces.length - 1);
+            showToast(`Created ${newName}`);
+        }
+
+        // ==========================================
+        // 刪除指定工作區
+        // ==========================================
+        function deleteWorkspace(index) {
+            if (project.workspaces.length <= 1) return;
+            const wasActive = project.workspaces[index].selected;
+            project.workspaces.splice(index, 1);
+            // 刪除項目 執行全量重繪
+            renderWorkspaceList();
+            if (wasActive) {
+                setActiveWorkspace(0);
+            }
+        }
+
+        // ==========================================
+        // 啟用/停用指定工作區
+        // ==========================================
+        function toggleWorkspaceEnabled(index) {
+            if (project.workspaces[index]) {
+                project.workspaces[index].enabled = !project.workspaces[index].enabled;
+                console.log(`Workspace ${index} enabled:`, project.workspaces[index].enabled);
+                // 複用 setActiveWorkspace 的原地更新邏輯
+                const activeIndex = project.workspaces.findIndex(ws => ws.selected);
+                setActiveWorkspace(activeIndex !== -1 ? activeIndex : 0);
+            }
+        }
+
+        // ==========================================
+        // 重命名專案
+        // ==========================================
+        function renameProject(newName) {
+            project.name = newName;
+            console.log("Project renamed to:", newName);
+        }
+
+        // ==========================================
+        // 重命名指定工作區
+        // ==========================================
+        function renameWorkspace(index, newName) {
+            if (project.workspaces[index]) {
+                project.workspaces[index].name = newName;
+                console.log(`Workspace ${index} renamed to:`, newName);
+                // 同步更新 DOM 上的提示資訊 (Hint)
+                const items = document.querySelectorAll('.workspace-item');
+                if (items[index]) {
+                    items[index].title = newName;
+                    const nameInput = items[index].querySelector('.workspace-name-input');
+                    if (nameInput) {
+                        nameInput.title = newName;
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // 左側 Sidebar 邏輯
+        // ==========================================
+        function toggleLeftSidebar() {
+            const leftSidebar = document.getElementById('leftSidebar');
+            const toggleButton = document.getElementById('leftSidebarToggleBtn');
+            // 先加上動畫標記類別, 防止滾輪閃爍
+            leftSidebar.classList.add('is-animating');
+            leftSidebar.classList.toggle('collapsed');
+            if (toggleButton) {
+                // We use a different class here to avoid conflicts with other styles
+                toggleButton.classList.toggle('expanded');
+            }
+            // 判斷收合或展開 以恢復或清除拖拉的寬度設定
+            if (leftSidebar.classList.contains('collapsed')) {
+                // 收合時清除 inline style 讓 css 內的 .collapsed 樣式接管
+                leftSidebar.style.width = '';
+                leftSidebar.style.minWidth = '';
+                leftSidebar.style.maxWidth = '';
+            } else if (lastSidebarWidth) {
+                // 展開時如果有記錄到上次拖拉的寬度 則恢復
+                leftSidebar.style.width = lastSidebarWidth + 'px';
+                leftSidebar.style.minWidth = lastSidebarWidth + 'px';
+                leftSidebar.style.maxWidth = lastSidebarWidth + 'px';
+            }
+            // 動畫結束後（0.3s）移除標記類別
+            setTimeout(() => {
+                leftSidebar.classList.remove('is-animating');
+            }, 300);
+            // 側邊欄寬度改變後 Blockly 需要重新計算畫布大小
+            smoothResizeBlockly();
+        }
+
+        // ==========================================
+        // 初始化左側邊欄拖拉調整大小
+        // ==========================================
+        function initLeftSidebarResizer() {
+            const resizer = document.getElementById('leftSidebarResizer');
+            const sidebar = document.getElementById('leftSidebar');
+            if (!resizer || !sidebar) return;
+            let isResizing = false;
+            resizer.addEventListener('mousedown', function(e) {
+                isResizing = true;
+                sidebar.classList.add('resizing');
+                document.body.style.cursor = 'ew-resize';
+                document.body.style.userSelect = 'none'; // 避免拖拉時反白到文字
+                e.preventDefault();
+            });
+            document.addEventListener('mousemove', function(e) {
+                if (!isResizing) return;
+                // 計算新寬度: 滑鼠 X 座標減去 Sidebar 左側在視窗的起始點
+                let newWidth = e.clientX - sidebar.getBoundingClientRect().left;
+                // 設定最小與最大寬度限制 (可依據實際需求微調)
+                if (newWidth < 150) newWidth = 150;
+                if (newWidth > 800) newWidth = 800;
+                sidebar.style.width = newWidth + 'px';
+                sidebar.style.minWidth = newWidth + 'px';
+                sidebar.style.maxWidth = newWidth + 'px';
+                lastSidebarWidth = newWidth;
+                // 動態調整大小時 強制觸發 window resize 事件讓 Blockly 即時適應排版
+                window.dispatchEvent(new Event('resize'));
+            });
+            document.addEventListener('mouseup', function(e) {
+                if (isResizing) {
+                    isResizing = false;
+                    sidebar.classList.remove('resizing');
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                    // 結束拖曳後 再發送一次平滑重繪確保無異樣
+                    smoothResizeBlockly();
+                }
+            });
+        }
+
+        // ==========================================
+        // 右側 Sidebar 邏輯
+        // ==========================================
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const toggleButton = document.querySelector('.sidebar-toggle');
+            sidebar.classList.toggle('collapsed');
+            if (toggleButton) {
+                toggleButton.classList.toggle('collapsed');
+            }
+            // 側邊欄寬度改變後 Blockly 需要重新計算畫布大小
+            smoothResizeBlockly();
+        }
+
+        // ==========================================
+        // Console 顯示/隱藏切換與高度控制
+        // ==========================================
+        function toggleConsole() {
+            const consoleArea = document.getElementById('consoleArea');
+            consoleArea.classList.toggle('collapsed');
+            // 處理開關時的高度樣式衝突
+            if (consoleArea.classList.contains('collapsed')) {
+                // 面板收起時 必須清除 inline style 高度 讓 CSS 的 collapsed 樣式接管
+                consoleArea.style.height = '';
+            } else {
+                // 面板展開時 套用目前記憶的高度階段
+                consoleArea.style.height = CONSOLE_HEIGHTS[currentConsoleHeightIdx];
+            }
+            // 通知 Blockly 重新計算寬高以填滿剩餘空間
+            smoothResizeBlockly();
+        }
+
+        function cycleConsoleHeight(event) {
+            // 防止點擊事件向上冒泡觸發其他的收合邏輯
+            if (event) event.stopPropagation();
+            const consoleArea = document.getElementById('consoleArea');
+            const resizeBtn = document.getElementById('consoleResizeBtn');
+            // 如果面板目前是收起的 先強制展開
+            if (consoleArea.classList.contains('collapsed')) {
+                consoleArea.classList.remove('collapsed');
+            }
+            // 將高度索引往下推進一個階段 若到底則循環回歸 0
+            currentConsoleHeightIdx = (currentConsoleHeightIdx + 1) % CONSOLE_HEIGHTS.length;
+            // 動態寫入新的高度至 DOM 元素的 style 中
+            consoleArea.style.height = CONSOLE_HEIGHTS[currentConsoleHeightIdx];
+            // 更新按鈕上的提示文字
+            if (resizeBtn) {
+                resizeBtn.innerText = CONSOLE_LABELS[currentConsoleHeightIdx];
+            }
+            // 觸發動畫 讓 Blockly 畫布平滑縮放適應新的可用空間
+            smoothResizeBlockly();
+        }
+
+        // ==========================================
+        // COM Port 掃描 (呼叫 Python)
+        // ==========================================
+        async function refreshComPorts() {
+            const icon = document.getElementById('refreshIcon');
+            const select = document.getElementById('comPortSelect');
+            if (icon) icon.classList.add('refreshing'); // 開始旋轉
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.list_serial_ports) {
+                try {
+                    const ports = await window.pywebview.api.list_serial_ports();
+                    select.innerHTML = '';
+                    if (ports.length === 0) {
+                        select.innerHTML = '<option value="">No Port Found</option>';
+                    } else {
+                        ports.forEach(port => {
+                            const opt = document.createElement('option');
+                            opt.value = port;
+                            opt.innerText = port;
+                            select.appendChild(opt);
+                        });
+                    }
+                } catch (error) {
+                    console.error("Failed to list ports:", error);
+                    showToast("Scan Error");
+                }
+            }
+            // 稍微延遲一下再停止旋轉 讓使用者感覺到有在動作
+            setTimeout(() => {
+                if (icon) icon.classList.remove('refreshing');
+            }, 500);
+        }
+
+        // ==========================================
+        // COM Port 連線切換
+        // ==========================================
+        async function toggleSerialPort() {
+            const btn = document.getElementById('connectPortBtn');
+            const port = document.getElementById('comPortSelect').value;
+            const baud = document.getElementById('baudRateSelect').value;
+            if (!port) return;
+            if (btn.innerText === "Connect") {
+                const success = await window.pywebview.api.open_serial_port(port, parseInt(baud, 10));
+                if (success) {
+                    btn.innerText = "Disconnect";
+                    btn.classList.add('connected');
+                    // 鎖定選單防止連線中更改
+                    document.getElementById('comPortSelect').disabled = true;
+                    document.getElementById('baudRateSelect').disabled = true;
+                    showToast(`Connected to ${port} @ ${baud}`);
+                }
+            } else {
+                await window.pywebview.api.close_serial_port();
+                btn.innerText = "Connect";
+                btn.classList.remove('connected');
+                // 解鎖選單
+                document.getElementById('comPortSelect').disabled = false;
+                document.getElementById('baudRateSelect').disabled = false;
+                showToast("Disconnected");
+            }
+        }
+
+        // ==========================================
+        // Log 分頁切換
+        // ==========================================
+        function switchLogTab(type, event) {
+            // 移除所有內容區的 active 狀態
+            document.querySelectorAll('.log-viewport').forEach(v => v.classList.remove('active'));
+            // 移除所有按鈕的 active 狀態
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            // 確定有這個 ID 的元素才加入 active
+            const targetLog = document.getElementById(type + 'Log');
+            if (targetLog) {
+                targetLog.classList.add('active');
+            } else {
+                console.warn(`Warning: Content area '${type}Log' not found in HTML!`);
+            }
+            // 按下的一定有 event 將按鈕亮起
+            if (event && event.currentTarget) {
+                event.currentTarget.classList.add('active');
+            }
+            // 處理 COM Port 專屬工具列的顯示/隱藏
+            const portSelector = document.getElementById('portSelectorContainer');
+            if (portSelector) {
+                if (type === 'serial') {
+                    portSelector.style.display = 'flex';
+                    refreshComPorts();
+                } else {
+                    portSelector.style.display = 'none'; // 切到 app 或 sccb 時隱藏
+                }
+            }
+            // 當切換到 OVDB 面板時 自動將 System Panel 放大到最大
+            if (type === 'ovdb' || type === 'stream') {
+                const consoleArea = document.getElementById('consoleArea');
+                const resizeBtn = document.getElementById('consoleResizeBtn');
+                if (consoleArea) {
+                    // 強制展開面板 (萬一使用者原本把它縮起來了)
+                    consoleArea.classList.remove('collapsed');
+                    // 將高度索引設為最大值 (2 對應到 CONSOLE_HEIGHTS 的 '80vh')
+                    currentConsoleHeightIdx = 2;
+                    consoleArea.style.height = CONSOLE_HEIGHTS[currentConsoleHeightIdx];
+                    // 同步更新右上方 "調整高度" 按鈕的提示文字 (變成 ↕️ Large)
+                    if (resizeBtn) {
+                        resizeBtn.innerText = CONSOLE_LABELS[currentConsoleHeightIdx];
+                    }
+                    // 觸發動畫 通知上方 Blockly 畫布縮小 讓出空間給放大的面板
+                    smoothResizeBlockly();
+                }
+            }
+        }
+
+        // ==========================================
+        // 提供給後端抓取所有 APP_LOG 內容
+        // ==========================================
+        window.getAppLogsList = function() {
+            const lines = document.querySelectorAll('#appLog .log-line');
+            // 將所有 .log-line 的文字收集成一個陣列 (Array)
+            return Array.from(lines).map(line => line.innerText);
+        };
+
+        // ==========================================
+        // 清除目前的 Log 內容
+        // ==========================================
+        function clearCurrentLog() {
+            const activeViewport = document.querySelector('.log-viewport.active');
+            if (!activeViewport) return;
+            // 判斷目前是哪一個頁籤
+            if (activeViewport.id === 'i2cLog') {
+                // --- 針對 I2C Operations 頁面的特殊清除邏輯 ---
+                // 清空右側的 Log 顯示區
+                const i2cTerminal = document.getElementById('i2cOutput');
+                if (i2cTerminal) {
+                    i2cTerminal.innerHTML = '';
+                }
+                // 清空左側的所有文字輸入框
+                document.getElementById('i2cId').value = '';
+                document.getElementById('i2cAddress').value = '';
+                document.getElementById('i2cData').value = '';
+                // 將下拉選單恢復到預設的 32bits (其 value 分別為 48 和 3)
+                document.getElementById('addrBitSelect').value = '48';
+                document.getElementById('dataBitSelect').value = '3';
+            } else if (activeViewport.id === 'ovdbLog') {
+                // 只清除 OVDB 右側的 Log
+                const ovdbOutput = document.getElementById('ovdbOutput');
+                if (ovdbOutput) ovdbOutput.innerHTML = '';
+            } else if (activeViewport.id === 'streamLog') {
+                // 影像預覽面板保護: 直接 return 不執行任何動作
+                // 防止工具列與 2x2 網格被 innerHTML = '' 給誤刪
+                return;
+            } else {
+                // --- Application 或 COM Port 頁面的預設清除邏輯 ---
+                activeViewport.innerHTML = '';
+            }
+        }
+
+        // ==========================================
+        // 初始化 Mermaid
+        // ==========================================
+        mermaid.initialize({ 
+            startOnLoad: false, 
+            theme: 'default',
+            securityLevel: 'loose' 
+        });
+
+        // ==========================================
+        // RESET Venus 設備重置邏輯
+        // ==========================================
+        async function resetVenusDevice() {
+            // 禁用按鈕防止重複點擊
+            const btn = document.getElementById('resetVenusBtn');
+            const originalText = btn.innerText;
+            // 呼叫後端 API 檢查並執行重置
+            if (window.pywebview && window.pywebview.api) {
+                try {
+                    btn.disabled = true;
+                    btn.innerText = 'Resetting...';
+                    showToast("Sending Reset Command...");
+                    // 呼叫後端 API
+                    // 回傳值定義: 0=成功, -1=失敗/不存在, 1=忙碌中忽略Reset操作
+                    const result = await window.pywebview.api.reset_venus_hardware();
+                    if (result === 0) {
+                        // 成功處理
+                        showToast("Success: Venus has been reset.");
+                        console.log("[Reset] Backend returned 0: Success.");
+                        // 重置成功後 同步重置 UI 狀態 (如燈號轉回橘色)
+                        resetExecutionUI(); 
+                    } 
+                    else if (result === 1) {
+                        // 測試中 (忙碌)
+                        showToast("Warning: Device busy. Reset aborted.");
+                        console.warn("[Reset] Backend returned 1: Device is testing.");
+                    } 
+                    else if (result === -1) {
+                        // 其他硬體錯誤
+                        showToast("Error: Device not found or reset failed.");
+                        console.error("[Reset] Backend returned -1: Hardware error.");
+                    }
+                } catch (error) {
+                    console.error("Reset API Error:", error);
+                    showToast("Failed to communicate with hardware.");
+                } finally {
+                    // 恢復按鈕狀態
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                }
+            } else {
+                // Browser Mode 模擬
+                showToast("[Simulation] Reset command sent to Venus.");
+                console.log("Reset Venus clicked in Browser Mode.");
+            }
+        }
+
+        // ==========================================
+        // I2C / SCCB Operations
+        // ==========================================
+        // ==========================================
+        // 根據選擇的 bit 數 驗證並補齊 16 進位字串長度
+        // ==========================================
+        function formatHexInput(rawValue, bitSelectId, fieldName) {
+            // 從選單的 text (例如 "16bit") 提取數字 算出需要幾個 16 進位字元
+            const selectElement = document.getElementById(bitSelectId);
+            const bitText = selectElement.options[selectElement.selectedIndex].text;
+            const bits = parseInt(bitText.replace('bit', '').replace('s', ''), 10);
+            const requiredCharLength = bits / 4; // 8bit -> 2 chars, 16bit -> 4 chars...
+            // 去除可能的空白或 '0x'
+            let cleanHex = rawValue.replace(/^0x/i, '').trim();
+            if (cleanHex === "") {
+                throw new Error(`${fieldName} cannot be empty.`);
+            }
+            if (cleanHex.length > requiredCharLength) {
+                throw new Error(`${fieldName} exceeds maximum length for ${bits}bits (Max: ${requiredCharLength} hex chars).`);
+            }
+            // 自動在左邊補 0 到指定長度
+            return cleanHex.padStart(requiredCharLength, '0');
+        }
+
+        // ==========================================
+        // 計算寬度設定值 (Width)
+        // ==========================================
+        function getI2cWidthSetting() {
+            const addrVal = parseInt(document.getElementById('addrBitSelect').value, 10);
+            const dataVal = parseInt(document.getElementById('dataBitSelect').value, 10);
+            // 進行位元或運算 (OR)
+            const widthValue = addrVal | dataVal; 
+            // 轉回 2 位數的 16 進位字串表示 (例如 0x11, 0x33)
+            return widthValue
+        }
+
+        // ==========================================
+        // 將訊息輸出到 I2C 專屬的右側終端機 (奈秒精度)
+        // ==========================================
+        function printToI2cTerminal(message, type="info") {
+            const terminal = document.getElementById('i2cOutput');
+            if (!terminal) return;
+            const line = document.createElement('div');
+            // 利用 performance API 取得高精度時間 (包含小數點的毫秒)
+            const exactTime = performance.timeOrigin + performance.now();
+            const date = new Date(exactTime);
+            const hh = String(date.getHours()).padStart(2, '0');
+            const mm = String(date.getMinutes()).padStart(2, '0');
+            const ss = String(date.getSeconds()).padStart(2, '0');
+            const ms = String(date.getMilliseconds()).padStart(3, '0');
+            // 擷取毫秒的小數點後部分 (轉換為 6 位數的 微秒+奈秒)
+            // 例如 exactTime = 164234567.891234 小數部分就是 0.891234
+            const fractionalMs = exactTime % 1; 
+            const nsStr = String(Math.floor(fractionalMs * 1000000)).padStart(6, '0');
+            // 組合出 [HH:MM:SS.mmmµµµnnn] (9位數小數)
+            const timeStamp = `[${hh}:${mm}:${ss}.${ms}${nsStr}]`;
+            // 替換空白與換行符號 (保護 padEnd 的排版)
+            let formattedMsg = message.replace(/ /g, '&nbsp;').replace(/\n/g, '<br>');
+            // 根據訊息類型決定顏色 並將時間戳記統一加在最前面！
+            if (type === "error") {
+                line.style.color = '#f48771'; // 錯誤: 珊瑚紅色
+                formattedMsg = `${timeStamp}&nbsp;!!&nbsp;${formattedMsg}`;
+            } else if (type === "write") {
+                line.style.color = '#CE9178'; // 寫入: VS Code 經典橘色
+                formattedMsg = `${timeStamp}&nbsp;>>&nbsp;${formattedMsg}`;
+            } else if (type === "read") {
+                line.style.color = '#569CD6'; // 讀取: VS Code 經典藍色
+                formattedMsg = `${timeStamp}&nbsp;<<&nbsp;${formattedMsg}`;
+            } else {
+                line.style.color = '#4ec9b0'; // 預設: 青綠色
+                formattedMsg = `${timeStamp}&nbsp;;;&nbsp;${formattedMsg}`;
+            }
+            line.style.marginBottom = "2px";  // 只有極小的行距
+            line.style.fontFamily = "'Consolas', 'Courier New', monospace";
+            line.style.whiteSpace = "nowrap";  // 確保過長的文字不會自動折行破壞表格 而是出現水平捲軸
+            line.innerHTML = formattedMsg;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+            if (terminal.childElementCount > 3500) {
+                terminal.removeChild(terminal.firstChild);
+            }
+        }
+
+        // ==========================================
+        // 鎖定或解鎖 I2C 操作按鈕
+        // ==========================================
+        function toggleI2cButtons(isDisabled) {
+            const readBtn = document.getElementById('i2cReadBtn');
+            const writeBtn = document.getElementById('i2cWriteBtn');
+            const fileBtn = document.getElementById('i2cSendFileBtn');
+            if (readBtn) readBtn.disabled = isDisabled;
+            if (writeBtn) writeBtn.disabled = isDisabled;
+            if (fileBtn) fileBtn.disabled = isDisabled;
+        }
+
+        // ==========================================
+        // 核心讀取邏輯: 可被 UI 或背景機制呼叫
+        // ==========================================
+        async function executeI2cRead(idHex, addrHex, widthHex, silent = false) {
+            // 解析寬度設定值 決定 Data 需要補幾個 16 進位字元 (0)
+            // widthHex 的低位元代表 Data 寬度 (0: 8bits, 1: 16bits, 3: 32bits)
+            const dataWidthVal = widthHex & 0x0F; 
+            let dataCharLen = 2; // 預設 8bits (2 個字元)
+            if (dataWidthVal === 1) dataCharLen = 4;      // 16bits
+            else if (dataWidthVal === 3) dataCharLen = 8; // 32bits
+            if (!silent) {
+                const printWid = '0x' + widthHex.toString(16).padStart(2, '0').toUpperCase();
+                const typeStr = "READ".padEnd(7, ' ');
+                const idStr   = `ID: 0x${idHex.toUpperCase()}`.padEnd(10, ' ');
+                const addrStr = `Addr: 0x${addrHex.toUpperCase()}`.padEnd(16, ' ');
+                // 發送請求時 等待的資料底線長度也會對應位元數 (例如 16bits 顯示 0x----)
+                const emptyDataStr = `Data: 0x${'-'.repeat(dataCharLen)}`.padEnd(16, ' '); 
+                const outputStr = `${typeStr} | ${idStr} | ${addrStr} | ${emptyDataStr} | WidthCfg: ${printWid}`;
+                printToI2cTerminal(outputStr, "read");
+            }
+            if (window.pywebview && window.pywebview.api) {
+                const response = await window.pywebview.api.i2c_read(idHex, addrHex, widthHex);
+                if (response.status === "success") {
+                    const data = response.data;
+                    if (!silent) {
+                        // 設置輸出為固定寬度
+                        const emptyTypeStr = "-----".padEnd(7, ' ');
+                        const emptyIdStr   = `--------`.padEnd(10, ' '); 
+                        const emptyAddrStr = `--------------`.padEnd(16, ' '); 
+                        const emptyWidthStr = `--------------`.padEnd(16, ' '); 
+                        // 將讀取回來的數字 依照剛才算出的長度向左補齊 0
+                        const dataHexPadded = data.toString(16).toUpperCase().padStart(dataCharLen, '0');
+                        const dataStr = `Data: 0x${dataHexPadded}`.padEnd(16, ' '); 
+                        const resultStr = `${emptyTypeStr} | ${emptyIdStr} | ${emptyAddrStr} | ${dataStr} | ${emptyWidthStr}`;
+                        printToI2cTerminal(resultStr, "read");
+                    }
+                    return data;
+                } else {
+                    throw new Error(response.message);
+                }
+            } else {
+                printToI2cTerminal("Without pywebview API", "error");
+                return "FF"; // 模擬資料
+            }
+        }
+
+        // ==========================================
+        // UI 按鈕綁定的單筆讀取函式
+        // ==========================================
+        async function i2cRead() {
+            try {
+                toggleI2cButtons(true);
+                // 取得並格式化 ID (固定最多 2 bytes = 4 hex chars)
+                let idHex = document.getElementById('i2cId').value.trim();
+                if(!idHex) throw new Error("Device ID cannot be empty.");
+                idHex = idHex.padStart(2, '0'); // 至少 1 byte 若需要 2 bytes 請改 padStart(4, '0')
+                // 取得並格式化 Address
+                const rawAddr = document.getElementById('i2cAddress').value || '0';
+                const addrHex = formatHexInput(rawAddr, 'addrBitSelect', 'Address');
+                // 取得硬體寬度設定值
+                const widthHex = getI2cWidthSetting();
+                // 將參數丟給核心函式執行
+                await executeI2cRead(idHex, addrHex, widthHex, false);
+            } catch (err) {
+                // 統一在此捕捉 UI 格式錯誤或後端丟回來的錯誤
+                printToI2cTerminal(err.message, "error");
+            } finally {
+                // 透過 finally 保證: 無論成功或出錯 最後一定會解鎖按鈕！
+                toggleI2cButtons(false); 
+            }
+        }
+
+        // ==========================================
+        // 核心寫入邏輯: 可被 UI 按鈕或外部檔案讀取流程共同呼叫
+        // ==========================================
+        async function executeI2cWrite(idHex, addrHex, dataHex, widthHex, silent = false) {
+            if (!silent) {
+                // 為了排版整齊 先把 widthHex 轉成顯示用的 16 進位字串
+                const printWid = '0x' + widthHex.toString(16).padStart(2, '0').toUpperCase();
+                // 格式化排版 (利用 padEnd 鎖定固定長度)
+                const typeStr = "WRITE".padEnd(7, ' ');
+                const idStr   = `ID: 0x${idHex.toUpperCase()}`.padEnd(10, ' ');
+                const addrStr = `Addr: 0x${addrHex.toUpperCase()}`.padEnd(16, ' ');
+                const dataStr = `Data: 0x${dataHex.toUpperCase()}`.padEnd(16, ' ');
+                const outputStr = `${typeStr} | ${idStr} | ${addrStr} | ${dataStr} | WidthCfg: ${printWid}`;
+                // 印出送出的請求
+                printToI2cTerminal(outputStr, "write");
+            }
+            // 呼叫 Python 後端 API
+            if (window.pywebview && window.pywebview.api) {
+                const response = await window.pywebview.api.i2c_write(idHex, addrHex, dataHex, widthHex);
+                if (response.status === "success") {
+                     // 寫入成功 可依需求決定是否要印出成功訊息
+                     // printToI2cTerminal("Write Success", "debug");
+                     return true;
+                } else {
+                     // 後端回報錯誤
+                     throw new Error(response.message);
+                }
+            } else {
+                // Browser Mode 模擬
+                printToI2cTerminal("Without pywebview API (Simulation)", "error");
+                return false;
+            }
+        }
+
+        // ==========================================
+        // UI 按鈕綁定的單筆寫入函式
+        // ==========================================
+        async function i2cWrite() {
+            try {
+                toggleI2cButtons(true);
+                // 從畫面取得並格式化 ID
+                let idHex = document.getElementById('i2cId').value.trim();
+                if(!idHex) throw new Error("Device ID cannot be empty.");
+                idHex = idHex.padStart(2, '0');
+                // 從畫面取得並格式化 Address & Data
+                const rawAddr = document.getElementById('i2cAddress').value || '0';
+                const addrHex = formatHexInput(rawAddr, 'addrBitSelect', 'Address');
+                const rawData = document.getElementById('i2cData').value || '0';
+                const dataHex = formatHexInput(rawData, 'dataBitSelect', 'Data');
+                // 取得硬體寬度設定值
+                const widthHex = getI2cWidthSetting();
+                // 將參數丟給核心函式執行
+                await executeI2cWrite(idHex, addrHex, dataHex, widthHex, false);
+            } catch (err) {
+                // 統一在此捕捉 UI 格式錯誤或後端丟回來的錯誤
+                showToast(err.message);
+                printToI2cTerminal(err.message, "error");
+            } finally {
+                // 透過 finally 保證: 無論成功或出錯 最後一定會解鎖按鈕！
+                toggleI2cButtons(false); 
+            }
+        }
+
+        // ==========================================
+        // UI 按鈕綁定的讀檔寫入函式
+        // ==========================================
+        async function i2cSendFileSettings() {
+            // 鎖定按鈕
+            toggleI2cButtons(true); 
+            try {
+                printToI2cTerminal("Waiting for file selection...", "info");
+                let fileContent = null;
+                let fileName = "";
+                // 嘗試呼叫 Python 後端開啟檔案對話框
+                if (window.pywebview && window.pywebview.api && window.pywebview.api.load_file_dialog) {
+                    const fileTypes = ['Text Files (*.txt)', 'CSV Files (*.csv)', 'All files (*.*)'];
+                    const result = await window.pywebview.api.load_file_dialog(projectDir, fileTypes);
+                    if (result && result.content) {
+                        fileContent = result.content;
+                        fileName = result.filename.split(/[/\\]/).pop();
+                    } else {
+                        printToI2cTerminal("File selection cancelled.", "error");
+                        return; // 提早結束
+                    }
+                } else {
+                    // 純瀏覽器模式備用方案
+                    fileContent = await new Promise((resolve) => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = '.txt,.csv';
+                        input.onchange = (e) => {
+                            const file = e.target.files[0];
+                            if (!file) {
+                                resolve(null);
+                                return;
+                            }
+                            fileName = file.name;
+                            const reader = new FileReader();
+                            reader.onload = (event) => resolve(event.target.result);
+                            reader.readAsText(file);
+                        };
+                        window.addEventListener('focus', () => {
+                            setTimeout(() => { if (!input.value) resolve(null); }, 300);
+                        }, { once: true });
+                        input.click();
+                    });
+                    if (!fileContent) {
+                        printToI2cTerminal("File selection cancelled.", "error");
+                        return;
+                    }
+                }
+                // 成功讀取檔案至記憶體！
+                printToI2cTerminal(`File Loaded: [${fileName}]`, "info");
+                printToI2cTerminal(`Size: ${fileContent.length} bytes`, "info");
+                printToI2cTerminal(`Ready for processing...`, "info");
+                // 呼叫核心腳本解析函式
+                await processI2cScriptContent(fileContent);
+            } catch (err) {
+                printToI2cTerminal(err.message, "error");
+            } finally {
+                // 透過 finally 保證: 無論成功或出錯 最後一定會解鎖按鈕！
+                toggleI2cButtons(false);
+            }
+        }
+
+        // ==========================================
+        // 解析腳本並依序執行
+        // ==========================================
+        async function processI2cScriptContent(content) {
+            // 支援 \r\n (Windows) 與 \n (Linux/Mac) 換行符號的分割
+            const lines = content.split(/\r?\n/);
+            for (let i = 0; i < lines.length; i++) {
+                // 去除頭尾空白
+                let line = lines[i].trim();
+                // 移除分號 (;) 後面的註解
+                line = line.split(';')[0].trim();
+                // 如果是空行 直接跳過
+                if (!line) continue;
+                const upperLine = line.toUpperCase();
+                const isCommand = upperLine.startsWith('SL') || upperLine.startsWith('DELAY');
+                const isIgnore = upperLine.startsWith('TAG:');
+                if (isIgnore) {
+                    printToI2cTerminal(`[Ignore] ${upperLine}`, "info");
+                } else if (isCommand) {
+                    // 處理 DELAY 指令
+                    const parts = line.split(/\s+/);
+                    if (parts.length > 1) {
+                        const hexValue = parts[1];
+                        const dlyTimeMs = parseInt(hexValue, 16); 
+                        printToI2cTerminal(`[Command] Delaying for ${dlyTimeMs} ms...`, "info");
+                        await delay(dlyTimeMs); 
+                    }
+                } else {
+                    // 處理暫存器操作 (ID Addr [Data])
+                    const parts = line.split(/\s+/);
+                    if (parts.length >= 2) {
+                        const dev = parts[0];
+                        const addr = parts[1];
+                        const data = parts[2]; // 可能為 undefined
+                        // 嚴格檢查是否為合法的 16 進位字串
+                        const hexRegex = /^[0-9A-Fa-f]+$/;
+                        if (!hexRegex.test(dev) || !hexRegex.test(addr) || (data && !hexRegex.test(data))) {
+                            printToI2cTerminal(`Hex Format Error at line ${i + 1}: ${line}`, "error");
+                            return; 
+                        }
+                        // 判斷 Address 寬度
+                        let addrWidthVal = 0;
+                        if (dev === '64') addrWidthVal = 48; 
+                        else if (dev === '40') addrWidthVal = 0;
+                        else {
+                            if (addr.length <= 2) addrWidthVal = 0;
+                            else if (addr.length <= 4) addrWidthVal = 16;
+                            else addrWidthVal = 48;
+                        }
+                        // 判斷 Data 寬度 (如果有 Data 參數的話)
+                        let dataWidthVal = 0;
+                        if (data) {
+                            if (dev === '64') dataWidthVal = 3;
+                            else if (dev === '40') dataWidthVal = 0;
+                            else {
+                                if (data.length <= 2) dataWidthVal = 0;
+                                else if (data.length <= 4) dataWidthVal = 1;
+                                else dataWidthVal = 3;
+                            }
+                        } else {
+                            // 若無 Data 參數, 預設採 8-bit Data 寬度讀取 (或由硬體下拉選單決定)
+                            dataWidthVal = parseInt(document.getElementById('dataBitSelect').value, 10);
+                        }
+                        const widthHex = addrWidthVal | dataWidthVal;
+                        let devInt = parseInt(dev, 16);
+                        // ID 為單數進入 READ 模式
+                        if (devInt % 2 !== 0) {
+                            let readDevInt = devInt - 1;
+                            let readDevHex = readDevInt.toString(16).padStart(2, '0');
+                            if (parts.length === 2) {
+                                // 2 個參數：執行 Normal READ 操作
+                                try {
+                                    await executeI2cRead(readDevHex, addr, widthHex, false);
+                                } catch (err) {
+                                    printToI2cTerminal(`Read Error at line ${i + 1}: ${err.message}`, "error");
+                                    return;
+                                }
+                            } else {
+                                // 3 個參數：執行 READ-VERIFY 操作
+                                const printWid = '0x' + widthHex.toString(16).padStart(2, '0').toUpperCase();
+                                const typeStr = "READ(V)".padEnd(7, ' ');
+                                const idStr   = `ID: 0x${readDevHex.toUpperCase()}`.padEnd(10, ' ');
+                                const addrStr = `Addr: 0x${addr.toUpperCase()}`.padEnd(16, ' ');
+                                const expStr  = `Data: 0x${data.toUpperCase()}`.padEnd(16, ' ');
+                                const outputReq = `${typeStr} | ${idStr} | ${addrStr} | ${expStr} | WidthCfg: ${printWid}`;
+                                printToI2cTerminal(outputReq, "read");
+                                try {
+                                    const readValNum = await executeI2cRead(readDevHex, addr, widthHex, true);
+                                    let dataCharLen = (dataWidthVal === 3) ? 8 : (dataWidthVal === 1 ? 4 : 2);
+                                    const readValHex = readValNum.toString(16).toUpperCase().padStart(dataCharLen, '0');
+                                    const expectedValHex = data.toUpperCase().padStart(dataCharLen, '0');
+                                    const emptyTypeStr = "-----".padEnd(7, ' ');
+                                    const emptyIdStr   = "--------".padEnd(10, ' ');
+                                    const emptyAddrStr = "--------------".padEnd(16, ' ');
+                                    const emptyWidthStr = "--------------".padEnd(16, ' ');
+                                    const dataStrOutput = `Data: 0x${readValHex}`.padEnd(16, ' ');
+                                    const feedbackStr = `${emptyTypeStr} | ${emptyIdStr} | ${emptyAddrStr} | ${dataStrOutput} | ${emptyWidthStr}`;
+                                    if (readValHex !== expectedValHex) {
+                                        printToI2cTerminal(feedbackStr, "error"); // 比對失敗顯示紅色
+                                    } else {
+                                        printToI2cTerminal(feedbackStr, "read");
+                                    }
+                                } catch (err) {
+                                    printToI2cTerminal(`Verify Error at line ${i + 1}: ${err.message}`, "error");
+                                    return;
+                                }
+                            }
+                        } else {
+                            // ID 為偶數：執行標準 WRITE 操作
+                            if (!data) {
+                                printToI2cTerminal(`Write Error at line ${i + 1}: Missing Data for Write op.`, "error");
+                                return;
+                            }
+                            try {
+                                await executeI2cWrite(dev, addr, data, widthHex, false);
+                            } catch (err) {
+                                printToI2cTerminal(`Script Error at line ${i + 1}: ${err.message}`, "error");
+                                return;
+                            }
+                        }
+                    } else {
+                        printToI2cTerminal(`Format Error at line ${i + 1}: ${line}`, "error");
+                        return;
+                    }
+                }
+            }
+            printToI2cTerminal("========== Script Processing Finished ==========", "info");
+        }
+
+        // ==========================================
+        // OVDB 專屬 Log 打印函式 (類似 Application Log)
+        // ==========================================
+        function printToOvdbLog(message, type = "info") {
+            const logBox = document.getElementById('ovdbOutput');
+            if (!logBox) return;
+            const line = document.createElement('div');
+            line.className = 'log-line';
+            // 利用 performance API 取得高精度時間 (包含小數點的毫秒)
+            const exactTime = performance.timeOrigin + performance.now();
+            const date = new Date(exactTime);
+            const hh = String(date.getHours()).padStart(2, '0');
+            const mm = String(date.getMinutes()).padStart(2, '0');
+            const ss = String(date.getSeconds()).padStart(2, '0');
+            const ms = String(date.getMilliseconds()).padStart(3, '0');
+            // 擷取毫秒的小數點後部分 (轉換為 6 位數的 微秒+奈秒)
+            // 例如 exactTime = 164234567.891234 小數部分就是 0.891234
+            const fractionalMs = exactTime % 1; 
+            const nsStr = String(Math.floor(fractionalMs * 1000000)).padStart(6, '0');
+            // 組合出 [HH:MM:SS.mmmµµµnnn] (9位數小數)
+            const timeStamp = `[${hh}:${mm}:${ss}.${ms}${nsStr}]`;
+            // 根據類型上色
+            if (type === "error") {
+                line.style.color = '#f48771'; // 珊瑚紅
+            } else if (type === "success") {
+                line.style.color = '#4ec9b0'; // 青綠色
+            } else if (type === "warning") {
+                line.style.color = '#e5c07b'; // 黃色
+            } else {
+                line.style.color = '#cccccc'; // 預設灰白
+            }
+            line.innerText = `${timeStamp} ${message}`;
+            logBox.appendChild(line);
+            // 自動捲動到底部
+            logBox.scrollTop = logBox.scrollHeight;
+            // 限制最多顯示 2000 行
+            if (logBox.childElementCount > 2000) {
+                logBox.removeChild(logBox.firstChild);
+            }
+        }
+
+        // ==========================================
+        // OVDB Load 按鈕與清單邏輯
+        // ==========================================
+        // 宣告一個變數用來記錄是否已經載入資料
+        let isOvdbLoaded = false;
+        // 全域防連點鎖
+        let isSendingOvdb = false; 
+
+        async function loadOvdb() {
+            // 互斥鎖: 如果正在傳送資料 絕對不允許載入新檔案
+            if (isSendingOvdb) {
+                printToOvdbLog("Warning: Currently sending data. Please wait...", "warning");
+                return;
+            }
+            const loadBtn = document.getElementById('loadOvdbBtn');
+            const fileList = document.getElementById('ovdbFileList');
+            // 讀取期間: 鎖死 Load 按鈕 並癱瘓 List 清單
+            loadBtn.disabled = true;
+            if (fileList) {
+                fileList.style.pointerEvents = 'none'; // 讓清單無視所有滑鼠點擊
+                fileList.style.opacity = '0.5';        // 變半透明 給予視覺提示
+            }
+            try {
+                // 優先嘗試透過 Python 後端開啟檔案 Dialog
+                if (window.pywebview && window.pywebview.api && window.pywebview.api.load_file_dialog) {
+                    try {
+                        const fileTypes = ['OVDB Files (*.ovd)'];
+                        const result = await window.pywebview.api.load_file_dialog(projectDir, fileTypes);
+                        if (result && result.filename) {
+                            // 只要使用者確定選了新檔案 立刻銷毀舊狀態與舊清單！
+                            // 避免驗證失敗時 畫面上還殘留上一個檔案的幽靈資料
+                            isOvdbLoaded = false;
+                            if (fileList) fileList.innerHTML = '';
+                            if (result.is_ovd_file !== true) {
+                                printToOvdbLog("Invalid OVDB file format (Magic Number mismatch).", "error");
+                                return; // 直接中斷 不要呼叫 C++ DLL！
+                            }
+                            let safeApiPath = result.filename.replaceAll('\\', '\\\\');
+                            // 取得純檔名 (給 fallback 使用)
+                            let justFileName = result.filename.split(/[/\\]/).pop(); 
+                            if (window.pywebview.api.load_db_file) {
+                                try {
+                                    const ret = await window.pywebview.api.load_db_file(safeApiPath);
+                                    if (ret != 0) {
+                                        isOvdbLoaded = true;
+                                        printToOvdbLog(`Loaded OVDB file: ${safeApiPath}`, "success");
+                                        // 開始解析檔案內容提取清單
+                                        const extractedItems = [];
+                                        // 支援 Windows \r\n 與 Linux \n
+                                        const lines = result.content.split(/\r?\n/); 
+                                        for (let i = 0; i < lines.length; i++) {
+                                            // 濾除這行最前面可能殘留的不可見二進位控制字元與空白
+                                            // \x00-\x1F 代表 ASCII 的控制字元 (例如二進位亂碼)
+                                            let cleanLine = lines[i].replace(/^[\s\x00-\x1F]+/, '');
+                                            // 只有字串的「最開頭」是 @@ 才處理 這樣就能忽略掉整行字串中間或註解裡出現的 @@
+                                            if (cleanLine.startsWith('@@')) {
+                                                // 擷取 @@ 後面的字串並去除頭尾可能的空白
+                                                const itemName = cleanLine.substring(2).trim();
+                                                if (itemName) {
+                                                    extractedItems.push(itemName);
+                                                }
+                                            }
+                                        }
+                                        // 如果完全沒有 @@ 標記 塞入 "檔名 all" 作為唯一選項
+                                        if (extractedItems.length === 0) {
+                                            extractedItems.push(`${justFileName} all`);
+                                            printToOvdbLog("No '@@' markers found. Defaulting to process all.", "warning");
+                                        } else {
+                                            printToOvdbLog(`Found ${extractedItems.length} items in OVDB.`, "info");
+                                        }
+                                        // 將陣列交給 UI 渲染函式
+                                        addItemsToOvdbList(extractedItems);
+                                    } else {
+                                        printToOvdbLog(`load_db_file() return NULL pointer`, "error");
+                                    }
+                                } catch (e) {
+                                    isOvdbLoaded = false;
+                                    printToOvdbLog(`load_db_file() failed: ${e}`, "error");
+                                }
+                            }
+                        } else {
+                            isOvdbLoaded = false;
+                        }
+                    } catch (e) {
+                        isOvdbLoaded = false;
+                        printToOvdbLog(`load_file_dialog() failed: ${e}`, "error");
+                    }
+                }
+            } catch (error) {
+                isOvdbLoaded = false;
+                printToOvdbLog(`Failed to load OVDB: ${error.message}`, "error");
+            } finally {
+                // 無論成功失敗 都要解鎖按鈕與清單
+                loadBtn.disabled = false;
+                if (fileList) {
+                    fileList.style.pointerEvents = 'auto'; // 恢復清單點擊功能
+                    fileList.style.opacity = '1';          // 恢復正常亮度
+                }
+            }
+        }
+
+        // 動態產生清單項目
+        function addItemsToOvdbList(itemsArray) {
+            const listContainer = document.getElementById('ovdbFileList');
+            listContainer.innerHTML = ''; // 清空先前的清單
+            itemsArray.forEach((itemText, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'ovdb-list-item';
+                // 加上 index 序號 (畫面上顯示從 1 開始)
+                const displayIndex = index + 1;
+                itemDiv.innerText = `${displayIndex}. ${itemText}`;
+                // 將原始的字串存入 dataset
+                itemDiv.dataset.rawText = itemText;
+                // 單擊事件 (選取效果)
+                itemDiv.onclick = function() {
+                    if (this.classList.contains('selected')) {
+                        return; 
+                    }
+                    // 移除其他項目的 selected 狀態
+                    document.querySelectorAll('.ovdb-list-item').forEach(el => el.classList.remove('selected'));
+                    // 加上目前點擊的狀態
+                    this.classList.add('selected');
+                    printToOvdbLog(`Selected: [${displayIndex}] ${this.dataset.rawText}`, "info");
+                };
+                // 雙擊事件 (呼叫 API 傳送資料)
+                itemDiv.ondblclick = async function() {
+                    // 雙重防護: 如果正在傳送中 直接忽略
+                    if (isSendingOvdb) {
+                        return; 
+                    }
+                    // 確保雙擊時 該項目也是選取狀態
+                    document.querySelectorAll('.ovdb-list-item').forEach(el => el.classList.remove('selected'));
+                    this.classList.add('selected');
+                    printToOvdbLog(`Sending setting [${displayIndex}] to device...`, "warning");
+                    // 上鎖: 傳送狀態, Load 按鈕, 以及整個清單
+                    isSendingOvdb = true;
+                    const loadBtn = document.getElementById('loadOvdbBtn');
+                    if (loadBtn) loadBtn.disabled = true;
+                    if (listContainer) {
+                        listContainer.style.pointerEvents = 'none'; // 傳送期間不允許點擊清單內其他項目
+                        listContainer.style.opacity = '0.7';        // 稍微變暗提示傳送中
+                    }
+                    try {
+                        // 呼叫 Python API
+                        if (window.pywebview && window.pywebview.api && window.pywebview.api.send_db_file) {
+                            const ret = await window.pywebview.api.send_db_file(displayIndex);
+                            // 回傳 1 代表成功
+                            if (ret === 1) { 
+                                printToOvdbLog(`Successfully sent: ${this.dataset.rawText}`, "success");
+                            } else {
+                                printToOvdbLog(`Failed to send setting. Return code: ${ret}`, "error");
+                            }
+                        } else {
+                            // Browser Mode 模擬效果
+                            await delay(1000); 
+                            printToOvdbLog(`[Simulation] send_db_file(${index}) called successfully.`, "success");
+                        }
+                    } catch (error) {
+                        printToOvdbLog(`API Exception: ${error.message || error}`, "error");
+                    } finally {
+                        // 解鎖: 傳送狀態, Load 按鈕, 清單互動
+                        isSendingOvdb = false;
+                        if (loadBtn) loadBtn.disabled = false;
+                        if (listContainer) {
+                            listContainer.style.pointerEvents = 'auto'; // 恢復清單點擊功能
+                            listContainer.style.opacity = '1';          // 恢復正常亮度
+                        }
+                    }
+                };
+                listContainer.appendChild(itemDiv);
+            });
+        }
+
+        // ==========================================
+        // 啟用/停用指定通道 UI 鎖定
+        // ==========================================
+        window.updateVcState = function(channel) {
+            const isEnabled = document.getElementById(`vcEnable${channel}`).checked;
+            const toolbar = document.getElementById(`vcToolbar${channel}`);
+            // 找出工具列下的選單與輸入框 (不含 checkbox 本身) 依據打勾狀態啟用或禁用
+            const controls = toolbar.querySelectorAll('select, input[type="number"]');
+            controls.forEach(ctrl => {
+                ctrl.disabled = !isEnabled;
+            });
+            // 若取消勾選 連帶清空影像殘影
+            if (!isEnabled) {
+                const img = document.getElementById(`vcImg${channel}`);
+                if (img) img.src = "";
+            }
+        };
+
+        // ==========================================
+        // Camera Stream 預覽邏輯
+        // ==========================================
+        let isStreaming = false;
+        let vcFrameCounts = [0, 0, 0, 0];  // 紀錄每一路的累計幀數
+        let vcLastFpsTime = [0, 0, 0, 0];  // 紀錄每一路的前次結算時間
+        let maximizedVc = -1;              // 記錄目前最大化的通道索引
+
+        // 切換最大化狀態邏輯
+        window.toggleMaximizeVc = function(channel) {
+            if (!isStreaming) return; // 沒在串流不執行
+            const isEnabled = document.getElementById(`vcEnable${channel}`).checked;
+            if (!isEnabled) return; // 該通道沒啟用不執行
+            const grid = document.querySelector('.stream-grid');
+            const cell = document.getElementById(`vcCell${channel}`);
+            if (!grid || !cell) return;
+            if (maximizedVc === channel) {
+                // 已放大 -> 還原 2x2
+                grid.classList.remove('maximized-mode');
+                cell.classList.remove('maximized');
+                maximizedVc = -1;
+            } else {
+                // 未放大 -> 執行放大
+                document.querySelectorAll('.stream-cell').forEach(el => el.classList.remove('maximized'));
+                grid.classList.add('maximized-mode');
+                cell.classList.add('maximized');
+                maximizedVc = channel;
+            }
+            smoothResizeBlockly(); // 觸發重繪
+        };
+
+        // ==========================================
+        // 格式與排序的連動選單邏輯
+        // ==========================================
+        window.updateSeqOptions = function(channel) {
+            const fmt = document.getElementById(`vcFormat${channel}`).value;
+            const seqSelect = document.getElementById(`vcSeq${channel}`);
+            if (!seqSelect) return;
+            seqSelect.innerHTML = ''; // 清空選項
+            if (fmt === '4' || fmt === '5' || fmt === '6' || fmt === '7') { // RAW and RGB格式
+                seqSelect.add(new Option('BGGR', 'BG'));
+                seqSelect.add(new Option('GBRG', 'GB'));
+                seqSelect.add(new Option('RGGB', 'RG'));
+                seqSelect.add(new Option('GRBG', 'GR'));
+            } else { // YUV 格式
+                seqSelect.add(new Option('YUYV', 'YUYV'));
+                seqSelect.add(new Option('YVYU', 'YVYU'));
+                seqSelect.add(new Option('UYVY', 'UYVY'));
+            }
+        }
+
+        // 點擊畫面切換該 VC 專屬工具列的顯示/隱藏
+        function toggleVcToolbar(channel) {
+            // 防呆: 串流中不允許切換收合狀態 (或是你可以拿掉這個 if 讓串流中也能隱藏工具列看乾淨畫面)
+            // 串流中也能點擊隱藏 視覺比較乾淨 但裡面的 input 已被鎖定不能改
+            const toolbar = document.getElementById(`vcToolbar${channel}`);
+            if (toolbar) {
+                toolbar.classList.toggle('hidden');
+            }
+        }
+
+        async function toggleStream() {
+            const btn = document.getElementById('streamToggleBtn');
+            if (!isStreaming) {
+                let vcConfigs = [];
+                for (let i = 0; i < 4; i++) {
+                    // 檢查是否有打勾 沒打勾的通道直接跳過 不送給 Python！
+                    const isEnabled = document.getElementById(`vcEnable${i}`).checked;
+                    if (!isEnabled) continue; 
+                    const format = parseInt(document.getElementById(`vcFormat${i}`).value);
+                    const width = parseInt(document.getElementById(`vcWidth${i}`).value);
+                    const height = parseInt(document.getElementById(`vcHeight${i}`).value);
+                    const seqSelect = document.getElementById(`vcSeq${i}`);
+                    const seq = seqSelect ? seqSelect.value : "";
+                    if (!width || !height || width <= 0 || height <= 0) {
+                        showToast(`Error: Invalid Size in VC ${i}`);
+                        return; 
+                    }
+                    vcConfigs.push({ channel: i, format: format, width: width, height: height, sequence: seq });
+                }
+                // 防呆: 如果全都沒勾選
+                if (vcConfigs.length === 0) {
+                    showToast("Please enable at least one VC channel!");
+                    return;
+                }
+                toggleStreamState(true);
+                if (window.pywebview && window.pywebview.api && window.pywebview.api.start_camera_stream) {
+                    try {
+                        const configJson = JSON.stringify(vcConfigs);
+                        const ret = await window.pywebview.api.start_camera_stream(configJson);
+                        if (ret === 0) showToast("Stream Started");
+                        else throw new Error("Backend error: " + ret);
+                    } catch (e) {
+                        showToast("Failed to start stream.");
+                        toggleStreamState(false); 
+                    }
+                } else {
+                    console.log("[Simulation] Start Stream with Configs:", vcConfigs);
+                    showToast("[Simulation] Stream Started");
+                }
+            } else {
+                toggleStreamState(false);
+                if (window.pywebview && window.pywebview.api && window.pywebview.api.stop_camera_stream) {
+                    await window.pywebview.api.stop_camera_stream();
+                    showToast("Stream Stopped");
+                } else {
+                    showToast("[Simulation] Stream Stopped");
+                }
+            }
+        }
+
+        // 強制重置 UI 狀態與表單鎖定
+        function toggleStreamState(state) {
+            isStreaming = state;
+            const btn = document.getElementById('streamToggleBtn');
+            const controls = document.querySelectorAll('.vc-toolbar select, .vc-toolbar input');
+            const tpDisplay = document.getElementById('throughputDisplay');
+            controls.forEach(control => {
+                control.disabled = state;
+            });
+            if (btn) {
+                if (state) {
+                    btn.innerText = "⏹️ Stop Stream";
+                    btn.classList.add('streaming');
+                } else {
+                    btn.innerText = "▶️ Start Stream";
+                    btn.classList.remove('streaming');
+                }
+            }
+            // 停止串流時
+            if (!state) {
+                if (tpDisplay) tpDisplay.innerText = "";
+                // 停止串流時自動還原最大化
+                if (maximizedVc !== -1) {
+                    const grid = document.querySelector('.stream-grid');
+                    const cell = document.getElementById(`vcCell${maximizedVc}`);
+                    if (grid) grid.classList.remove('maximized-mode');
+                    if (cell) cell.classList.remove('maximized');
+                    maximizedVc = -1;
+                }
+            }
+            // 控制 FPS Counter 的顯示, 重置, 以及清空畫面殘影
+            for (let i = 0; i < 4; i++) {
+                const fpsEl = document.getElementById(`fpsCounter${i}`);
+                const isChecked = document.getElementById(`vcEnable${i}`).checked;
+                if (state && isChecked) {
+                    // 開始串流且該通道有啟用 顯示並初始化計時器
+                    if (fpsEl) {
+                        fpsEl.style.display = 'block';
+                        fpsEl.innerText = 'Wait...';
+                    }
+                    vcFrameCounts[i] = 0;
+                    vcLastFpsTime[i] = performance.now();
+                } else {
+                    // 停止串流或未啟用 隱藏計數器並清空影像殘影
+                    if (fpsEl) fpsEl.style.display = 'none';
+                    const img = document.getElementById(`vcImg${i}`);
+                    if (img) img.src = "";
+                }
+            }
+        }
+
+        // 即時更新翻轉狀態給後端
+        window.updateTransform = async function() {
+            const mirror = document.getElementById('globalMirror').checked;
+            const flip = document.getElementById('globalFlip').checked;
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.update_stream_transform) {
+                await window.pywebview.api.update_stream_transform(mirror, flip);
+            }
+        };
+
+        // ==========================================
+        // 監聽專用的 ready 事件
+        // ==========================================
+        window.addEventListener('pywebviewready', function() {
+            console.log("PyWebview is ready!\n");
+            showToast("PyWebview is ready!");
+            // 現在才開始檢查狀態 (才能夠透過pywebview去呼叫帶入的python API)
+            // 增加到 500ms 確保視窗完全穩定
+            setTimeout(() => {
+                updateAppTitle(FILENAME_DEFAULT, false)
+                const resetVenusBtn = document.getElementById('resetVenusBtn');
+                if (resetVenusBtn) resetVenusBtn.style.display = 'block';
+                // 讀取由 index.py 注入的變數並更新 UI
+                if (window.APP_VERSION) {
+                    document.getElementById('appVersionDisplay').innerText = "v" + window.APP_VERSION;
+                } else {
+                    document.getElementById('appVersionDisplay').innerText = "v Unknown";
+                }
+                // 將監聽器掛載到全域的 workspace 物件上
+                if (typeof workspace !== 'undefined') {
+                    attachBlocklyChangeListener(workspace);
+                }
+            }, 500);
+        });
+
+        // ==========================================
+        // 監聽使用者按下F5功能鍵事件
+        // ==========================================
+        window.addEventListener('keydown', function (e) {
+            // 攔截 F5 (116)
+            if (e.keyCode === 116 ) {
+                e.preventDefault(); // 攔截前端刷新導致後端不同步
+                if(e.ctrlKey){
+                    isDebugMode = !isDebugMode;
+                    const status = isDebugMode ? "ON" : "OFF";
+                    showToast(`Debug Mode: ${status}`);
+                    updateDebugUI(); // 呼叫函式來更新 UI
+                }
+            }else if (e.ctrlKey && e.keyCode === 82) {
+                // 攔截 Ctrl+R (82)
+                e.preventDefault(); // 攔截前端刷新導致後端不同步
+            }
+        });
+
+        // ==========================================
+        // 設置 Blockly 變更監聽
+        // ==========================================
+        function attachBlocklyChangeListener(workspace) {
+            workspace.addChangeListener(function(event) {
+                // 我們只在意會改變程式邏輯的事件 (排除 UI 點擊, 選取, 滾動等)
+                const DATA_CHANGES = [
+                    Blockly.Events.BLOCK_CREATE,
+                    Blockly.Events.BLOCK_DELETE,
+                    Blockly.Events.BLOCK_CHANGE,
+                    Blockly.Events.BLOCK_MOVE
+                ];
+                if (DATA_CHANGES.includes(event.type) && !event.isUiEvent) {
+                    // console.log("Workspace changed, adding '*' mark.\n");
+                    updateAppTitle(null, true); 
+                }
+            });
+        }
+
+        // ==========================================
+        // 讓 Python 通知前端「事件觸發了」  (例如: 硬體斷線, 測試完成, 或是收到特定的數據) 
+        // ==========================================
+        window.handleBackendEvent = async function(eventName, data) {
+            if (eventName === 'TEST_FINISHED') {
+                showToast("Test Process Completed.");
+                // 讀取 Python 傳過來的 data
+                if (data) {
+                    console.log("Receive Test Result Information");
+                    // console.log("測試結果狀態:", data.status);
+                    // console.log("報告路徑:", data.report_path);
+                    // if (data.status === "PASS") {
+                    //     showToast(data.message); 
+                    // } else {
+                    //     showToast("Test Failed with " + data.error_count + " errors");
+                    // }
+                }
+                // 測試結束時 恢復 UI 到閒置狀態
+                toggleTestUI(false);
+            }
+            // 處理 GENS 視窗關閉事件
+            else if (eventName === 'GENS_CLOSED') {
+                const btn = document.getElementById('generatePathButton');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = "Generate DataPath"; // 恢復原值
+                }
+                showToast("GENS Tool Closed.");
+            }
+            // 處理 ATB 設定視窗關閉
+            else if (eventName === 'ATB_CONFIG_CLOSED') {
+                const btn = document.getElementById('atbConfigButton');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = "ATB Board Cfg";
+                }
+                showToast("ATB Configuration Closed.");
+            }
+            else if (eventName === 'APP_LOG') {
+                const logBox = document.getElementById('appLog');
+                if (!logBox) return;
+                const line = document.createElement('div');
+                line.className = 'log-line';
+                // 判斷是否為錯誤訊息 (sys.stderr 傳過來的通常包含 Traceback)
+                if (data.toLowerCase().includes('error') || data.toLowerCase().includes('exception')) {
+                    line.style.color = '#f48771'; // 珊瑚紅色
+                }
+                else if (data.toLowerCase().includes('warning') || data.toLowerCase().includes('ignore')) {
+                    line.style.color = '#e5c07b'; // 柔和黃色
+                }
+                line.innerText = `${data}`;
+                logBox.appendChild(line);
+                // 自動捲動到底部
+                logBox.scrollTop = logBox.scrollHeight;
+                // 限制顯示行數 (例如最多 3500 行) 防止記憶體過載
+                if (logBox.childElementCount > 3500) {
+                    logBox.removeChild(logBox.firstChild);
+                }
+            }
+            else if (eventName === 'SERIAL_LOG') {
+                const logBox = document.getElementById('serialLog');
+                if (!logBox) return;
+                const line = document.createElement('div');
+                line.className = 'log-line';
+                // 檢查是否包含 Ro[數字]
+                if (/Ro\[\d+\]/.test(data)) {
+                    line.style.color = '#569CD6'; // 讀取: VS Code 經典藍色
+                } else {
+                    // 來自硬體的資料通常帶有特殊色以便區分
+                    line.style.color = '#4ec9b0'; // 青綠色
+                }
+                line.innerText = `>> ${data}`;
+                logBox.appendChild(line);
+                logBox.scrollTop = logBox.scrollHeight;
+                if (logBox.childElementCount > 1000) logBox.removeChild(logBox.firstChild);
+            }
+            // 處理推播過來的影像畫面
+            else if (eventName === 'CAMERA_FRAME') {
+                const ch = data.channel;
+                const imgElement = document.getElementById('vcImg' + ch);
+                if (imgElement) {
+                    imgElement.src = data.data;
+                    // --- 真實 Display FPS 計算邏輯 ---
+                    vcFrameCounts[ch]++;
+                    const now = performance.now();
+                    const elapsed = now - vcLastFpsTime[ch];
+                    // 每經過 1 秒鐘 (1000 毫秒) 結算一次 FPS
+                    if (elapsed >= 1000) {
+                        // FPS = (總幀數 * 1000) / 經過的毫秒
+                        const fps = Math.round((vcFrameCounts[ch] * 1000) / elapsed);
+                        const fpsEl = document.getElementById('fpsCounter' + ch);
+                        if (fpsEl) {
+                            fpsEl.innerText = fps + " FPS";
+                        }
+                        // 重置計數器與時間 準備下一個 1 秒
+                        vcFrameCounts[ch] = 0;
+                        vcLastFpsTime[ch] = now;
+                    }
+                } else {
+                    console.warn("找不到對應的 img 標籤來顯示影像, channel:", ch);
+                }
+            }
+            else if (eventName === 'THROUGHPUT') {
+                const displayEl = document.getElementById('throughputDisplay');
+                if (displayEl) {
+                    displayEl.innerText = "USB Throughput: " + data.value;
+                }
+            }
+        };
+
+        // ==========================================
+        // 接收 Mermaid 語法 渲染成 SVG 後轉為 Base64 回傳給 Python
+        // @param {string} definition - Mermaid 語法字串
+        // @returns {Promise<string>} - Base64 圖片字串
+        // ==========================================
+        window.renderMermaidToBase64 = async function(definition) {
+            console.error("JS received definition, starting render..."); 
+            try {
+                const id = 'mermaid-render-' + Date.now();
+                // Mermaid 10+ 版本的 render 是非同步的 且直接回傳 { svg }
+                const { svg } = await mermaid.render(id, definition);
+                // 轉 Base64
+                const base64 = btoa(unescape(encodeURIComponent(svg)));
+                return `data:image/svg+xml;base64,${base64}`;
+            } catch (err) {
+                console.error("Mermaid Render Internal Error:", err);
+                return ""; // 回傳空字串讓 Python 知道失敗
+            }
+        };
+
+        // ==========================================
+        // 儲存Blcoks定義
+        // ==========================================
+        // async function exportBlockDefinitions() {
+        //     const allBlocks = {};
+        //     const blockTypes = Object.keys(Blockly.Blocks);
+        //     // showToast("正在掃描積木結構...");
+        //     blockTypes.forEach(type => {
+        //         if (type.startsWith('flyout_')) return;
+        //         try {
+        //             const tempWorkspace = new Blockly.Workspace();
+        //             const block = tempWorkspace.newBlock(type);
+        //             const info = {
+        //                 type: type,
+        //                 fields: [],
+        //                 inputs: [],
+        //                 output: block.outputConnection ? block.outputConnection.check_ : null,
+        //                 hasPrevious: !!block.previousConnection,
+        //                 hasNext: !!block.nextConnection
+        //             };
+        //             block.inputList.forEach(input => {
+        //                 input.fieldRow.forEach(field => {
+        //                     if (field.name) {
+        //                         info.fields.push({
+        //                             name: field.name,
+        //                             type: field.constructor.name
+        //                         });
+        //                     }
+        //                 });
+        //                 if (input.name) {
+        //                     info.inputs.push({
+        //                         name: input.name,
+        //                         type: input.type 
+        //                     });
+        //                 }
+        //             });
+        //             allBlocks[type] = info;
+        //             tempWorkspace.dispose();
+        //         } catch (e) {
+        //             allBlocks[type] = { type: type, error: "Initialization failed" };
+        //         }
+        //     });
+        //     const jsonStr = JSON.stringify(allBlocks, null, 2);
+        //     // --- 改為存檔模式 ---
+        //     const blob = new Blob([jsonStr], { type: "application/json" });
+        //     try {
+        //         // 優先使用現代的檔案存取 API (可自選路徑)
+        //         if (window.showSaveFilePicker) {
+        //             const handle = await window.showSaveFilePicker({
+        //                 suggestedName: 'block_definitions_spec.json',
+        //                 types: [{
+        //                     description: 'JSON Files',
+        //                     accept: {'application/json': ['.json']},
+        //                 }],
+        //             });
+        //             const writable = await handle.createWritable();
+        //             await writable.write(blob);
+        //             await writable.close();
+        //             // showToast("定義檔已儲存！");
+        //         } else {
+        //             // 備用方案: 直接觸發瀏覽器下載
+        //             const url = URL.createObjectURL(blob);
+        //             const a = document.createElement("a");
+        //             a.href = url;
+        //             a.download = "block_definitions_spec.json";
+        //             document.body.appendChild(a);
+        //             a.click();
+        //             document.body.removeChild(a);
+        //             URL.revokeObjectURL(url);
+        //             // showToast("已存至下載資料夾");
+        //         }
+        //     } catch (err) {
+        //         if (err.name !== 'AbortError') {
+        //             console.error(err);
+        //             // showToast("存檔失敗");
+        //         }
+        //     }
+        // }
+
+        // ==========================================
+        // 取得 Workspace 截圖的 Base64 字串
+        // ==========================================
+        function getWorkspaceImageBase64() {
+            return new Promise((resolve, reject) => {
+                if (typeof workspace === 'undefined' || !workspace) {
+                    resolve("");
+                    return;
+                }
+                if (workspace.getAllBlocks(false).length === 0) {
+                    resolve("");
+                    return;
+                }
+                try {
+                    const bbox = workspace.getBlocksBoundingBox();
+                    const padding = 30;
+                    const originalWidth = bbox.right - bbox.left + padding * 2;
+                    const originalHeight = bbox.bottom - bbox.top + padding * 2;
+                    const blockCanvas = workspace.getCanvas().cloneNode(true);
+                    blockCanvas.removeAttribute('transform');
+                    blockCanvas.setAttribute('transform', `translate(${-bbox.left + padding}, ${-bbox.top + padding})`);
+                    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                    svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                    svg.setAttribute('width', originalWidth);
+                    svg.setAttribute('height', originalHeight);
+                    const originalSvg = workspace.getParentSvg();
+                    if (originalSvg.getAttribute('class')) {
+                        svg.setAttribute('class', originalSvg.getAttribute('class'));
+                    }
+                    // 打包網頁上所有的 CSS 與強制保險樣式
+                    const styleElement = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+                    let combinedCss = "";
+                    // 抓取網頁上所有的 <style> 標籤 (這包含了 Blockly 動態注入的 Theme)
+                    document.querySelectorAll('style').forEach(s => {
+                        combinedCss += s.innerHTML + "\n";
+                    });
+                    // 就算 Blockly 主題沒抓到 也要強迫輸入框變成白底
+                    combinedCss += `
+                        /* 可編輯的文字/數字輸入框: 白底半透明 */
+                        .blocklyEditableText > rect, .blocklyFieldRect { 
+                            fill: #ffffff !important; 
+                            fill-opacity: 0.6 !important; 
+                            stroke: none !important; 
+                        }
+                        /* 不可編輯的純文字背景: 完全透明 */
+                        .blocklyNonEditableText > rect { 
+                            fill: transparent !important; 
+                            stroke: none !important; 
+                        }
+                        /* 下拉選單的背景 */
+                        .blocklyDropdownText { 
+                            fill: #ffffff !important; 
+                        }
+                    `;
+                    styleElement.textContent = combinedCss;
+                    svg.appendChild(styleElement);
+                    // 複製 defs (包含積木的陰影濾鏡)
+                    const originalDefs = originalSvg.querySelector('defs');
+                    if (originalDefs) svg.appendChild(originalDefs.cloneNode(true));
+                    svg.appendChild(blockCanvas);
+                    const xml = new XMLSerializer().serializeToString(svg);
+                    const svg64 = btoa(unescape(encodeURIComponent(xml)));
+                    const image64 = 'data:image/svg+xml;base64,' + svg64;
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        const MAX_WIDTH = 1600; 
+                        let scale = 1.0;
+                        if (originalWidth > MAX_WIDTH) {
+                            scale = MAX_WIDTH / originalWidth;
+                        } else {
+                            scale = 1.2; 
+                        }
+                        canvas.width = originalWidth * scale;
+                        canvas.height = originalHeight * scale;
+                        const ctx = canvas.getContext('2d');
+                        // 填滿白底
+                        ctx.fillStyle = "#ffffff"; 
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.scale(scale, scale);
+                        ctx.drawImage(img, 0, 0);
+                        const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                        resolve(jpegDataUrl);
+                    };
+                    img.onerror = function(err) { 
+                        console.error("Image load error:", err);
+                        resolve(""); 
+                    };
+                    img.src = image64;
+                } catch (err) {
+                    console.error("Error generating workspace image", err);
+                    resolve("");
+                }
+            });
+        }
+
+        // ==========================================
+        // 輸入框限制: 僅允許十六進位字元 並自動轉大寫
+        // ==========================================
+        function setupHexInputs() {
+            // 找出所有需要限制為 Hex 的輸入框 ID
+            const hexInputIds = ['i2cId', 'i2cAddress', 'i2cData'];
+            hexInputIds.forEach(id => {
+                const inputElement = document.getElementById(id);
+                if (inputElement) {
+                    inputElement.addEventListener('input', function(e) {
+                        // 取得目前輸入的值
+                        let val = this.value;
+                        // 使用 Regular Expression 移除非 16 進位字元 ([^0-9A-Fa-f])
+                        val = val.replace(/[^0-9A-Fa-f]/g, '');
+                        // 自動轉換為大寫
+                        this.value = val.toUpperCase();
+                    });
+                }
+            });
+        }
+
+        // ==========================================
+        // 初始化函式
+        // ==========================================
+        function initApp() {
+            console.log("App initializing...");
+            // 初始化 4 個通道的格式選單 與 勾選鎖定狀態
+            for (let i = 0; i < 4; i++) {
+                window.updateSeqOptions(i);
+                window.updateVcState(i);
+            }
+            // 啟動輸入框的 Hex 限制
+            setupHexInputs();
+            // 呼叫 script/index.js 中的 start()
+            if (typeof start === 'function') {
+                start();
+                performSwitch(GLOBAL_BOARD_ID); // 強制執行一次初始切換邏輯 確保 UI 狀態同步
+                updateDebugUI(); // 初始化時根據預設值更新一次 UI
+            } else {
+                console.error("找不到 start() 函式 請檢查 script/index.js 是否載入成功");
+            }
+            // 在啟動時手動呼叫一次渲染側邊欄
+            renderWorkspaceList();
+            // 啟動側邊欄拖拉事件
+            initLeftSidebarResizer();
+        }
+    </script>
+</body>
+</html>
