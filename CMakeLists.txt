@@ -563,9 +563,6 @@ ADD_CUSTOM_TARGET(package_nsis
     COMMAND powershell -Command "Write-Host '>>> [package_nsis    Start] ' (Get-Date -Format 'HH:mm:ss')"
     # 在這邊 "偷渡" 要打包的檔案 (package_zip 的打包會不包含此檔案)
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${RELEASE_DIR}/fpga_autotest.hex"
-            "${RELEASE_DIR}/oneDir/fpga_autotest.hex"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${RELEASE_DIR}/fpga_autotest_V30.hex"
             "${RELEASE_DIR}/oneDir/fpga_autotest_V30.hex"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -580,8 +577,6 @@ ADD_CUSTOM_TARGET(package_nsis
             "${RELEASE_DIR}/${EXE_NAME}_Setup.exe"
     # CPack 必須在 build (Binary) 資料夾執行，因為 CPackConfig.cmake 在那裡
     # 在這邊移除 "偷渡" 的檔案
-    COMMAND ${CMAKE_COMMAND} -E remove
-            "${RELEASE_DIR}/oneDir/fpga_autotest.hex"
     COMMAND ${CMAKE_COMMAND} -E remove
             "${RELEASE_DIR}/oneDir/fpga_autotest_V30.hex"
     COMMAND ${CMAKE_COMMAND} -E remove
@@ -607,5 +602,14 @@ ADD_CUSTOM_TARGET(package_all ALL
 )
 
 SET(CPACK_INSTALL_CMAKE_PROJECTS "")
+SET(CPACK_NSIS_EXTRA_PREINSTALL_COMMANDS "
+  Delete $INSTDIR\\\\*.*
+  Delete $INSTDIR\\\\_internal\\\\*.*
+  RMDir  $INSTDIR\\\\_internal
+")
+SET(CPACK_NSIS_PACKAGE_NAME "${EXE_NAME}")
+SET(CPACK_NSIS_MUI_FINISHPAGE_RUN "${EXE_NAME}.exe") # 這是原本就有的話
+# 可以在安裝開始前提示使用者關閉程式
+SET(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\${EXE_NAME}.exe")
 # 啟用 CPack (這行必須放在最後)
 INCLUDE(CPack)

@@ -1,0 +1,1931 @@
+/* ========================================= */
+/* 全域設定 */
+/* ========================================= */
+body {
+    margin: 0;
+    height: 100vh;
+    /* 高度佔滿整個視窗 */
+    display: flex;
+    /* 啟用左右佈局 */
+    overflow: hidden;
+    /* 防止出現最外層捲軸 */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    background-color: #fff;
+}
+
+/* ========================================= */
+/* 左邊主畫面區域 (85%) - 放置 Blockly */
+/* ========================================= */
+.main-area {
+    flex: 8.5;
+    /* 佔 8.5/10 的寬度 */
+    display: flex;
+    /* 讓內部再做垂直切割 */
+    flex-direction: column;
+    background-color: #fff;
+    position: relative;
+    height: 100vh;
+    min-width: 0;
+    /* Flexbox 巢狀佈局的重要設定，防止溢出 */
+    overflow: hidden;
+}
+
+/* Blockly 標題與控制列 */
+.blockly-header {
+    padding: 10px;
+    background-color: #f0f0f0;
+    border-bottom: 1px solid #ccc;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 50px;
+    box-sizing: border-box;
+    /* 確保 padding 不會撐大高度 */
+}
+
+/* 標題左側群組設定 */
+.header-left {
+    display: flex;
+    align-items: center;
+    /* 垂直置中對齊 */
+    gap: 10px;
+    /* 標題與選單的間距 */
+}
+
+.sidebar-toggle-btn {
+    background: none;
+    border: none;
+    color: #333;
+    cursor: pointer;
+    margin-right: 10px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    width: 32px;
+    border-radius: 6px;
+    transition: background-color 0.2s;
+}
+
+.sidebar-toggle-btn:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.sidebar-toggle-btn img {
+    pointer-events: none;
+    /* 防止圖片攔截點擊事件 */
+}
+
+/* 圖標切換邏輯 */
+.sidebar-toggle-btn .icon-hide {
+    display: none;
+}
+
+.sidebar-toggle-btn .icon-show {
+    display: block;
+}
+
+/* 當按鈕被加上 .expanded 類別（代表側邊欄已展開） */
+.sidebar-toggle-btn.expanded .icon-hide {
+    display: block;
+}
+
+.sidebar-toggle-btn.expanded .icon-show {
+    display: none;
+}
+
+.blockly-header h1 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: #333;
+    /* white-space: nowrap;  防止標題換行 (視情況開啟) */
+}
+
+/* 下拉選單樣式優化 */
+#boardSelect {
+    padding: 5px 10px;
+    font-size: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: white;
+    cursor: pointer;
+    font-weight: bold;
+    color: #007acc;
+    /* 字體顏色用藍色凸顯它是可選的 */
+}
+
+#boardSelect:focus {
+    outline: none;
+    border-color: #007acc;
+}
+
+/* Blockly 畫布容器 (最重要的部分) */
+#blocklyDiv {
+    flex: 1;
+    /* 佔滿剩餘的所有高度 */
+    width: 100%;
+    height: 100%;
+    position: relative;
+    /* 確保 Blockly 注入位置正確 */
+    min-height: 200px;
+    /* 增加一個最小高度保險 */
+    transition: height 0.3s ease;
+}
+
+.console-area {
+    position: relative !important;
+    background: #1e1e1e;
+    border-top: 1px solid #333;
+    display: flex;
+    flex-direction: column;
+    height: 200px;
+    /* 展開時的高度 */
+    transition: height 0.3s ease;
+}
+
+.console-area.collapsed {
+    height: 30px;
+    /* 摺疊時只剩下 toggle bar 的高度 */
+}
+
+.console-toggle {
+    height: 30px;
+    background: #2d2d2d;
+    color: #aaa;
+    display: flex;
+    align-items: center;
+    padding: 0 15px;
+    cursor: pointer;
+    font-size: 12px;
+    user-select: none;
+}
+
+.console-toggle:hover {
+    background: #3e3e3e;
+    color: #fff;
+}
+
+#consoleArrow {
+    margin-right: 8px;
+    transition: transform 0.3s;
+    transform: rotate(0deg);
+}
+
+.console-area:not(.collapsed) #consoleArrow {
+    transform: rotate(180deg);
+    /* 展開時箭頭向下 */
+}
+
+.port-selector-container {
+    display: flex;
+    align-items: center;
+    margin-left: 20px;
+    gap: 8px;
+}
+
+#comPortSelect {
+    background: #3c3c3c;
+    color: #eee;
+    border: 1px solid #555;
+    font-size: 11px;
+    padding: 2px 5px;
+    border-radius: 3px;
+    outline: none;
+}
+
+#connectPortBtn {
+    background: #0e639c;
+    color: white;
+    border: none;
+    font-size: 11px;
+    padding: 3px 10px;
+    cursor: pointer;
+    border-radius: 3px;
+}
+
+#connectPortBtn:hover {
+    background: #1177bb;
+}
+
+#connectPortBtn.connected {
+    background: #e51400;
+}
+
+/* 連線後變紅色(斷開) */
+
+.icon-btn {
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0 5px;
+    display: flex;
+    align-items: center;
+    transition: color 0.2s;
+}
+
+.icon-btn:hover {
+    color: #fff;
+}
+
+/* 旋轉動畫定義 */
+@keyframes rotate-loading {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+#baudRateSelect {
+    background: #3c3c3c;
+    color: #eee;
+    border: 1px solid #555;
+    font-size: 11px;
+    padding: 2px 5px;
+    border-radius: 3px;
+    outline: none;
+    margin-right: 10px;
+}
+
+.refreshing {
+    animation: rotate-loading 0.8s linear infinite;
+    color: #0e639c !important;
+}
+
+/* 內容區域控制 */
+.console-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.console-area.collapsed .console-content {
+    display: none;
+    /* 摺疊時不渲染內容 */
+}
+
+/* 分頁按鈕樣式 */
+.console-tabs {
+    display: flex;
+    background: #252526;
+    padding: 0 10px;
+    border-bottom: 1px solid #333;
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    color: #888;
+    padding: 8px 15px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.tab-btn.active {
+    color: #fff;
+    border-bottom: 2px solid #007acc;
+}
+
+.log-viewport {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    color: #d4d4d4;
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    display: none;
+}
+
+.log-viewport.active {
+    display: block;
+}
+
+.clear-btn {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    font-size: 11px;
+}
+
+.clear-btn:hover {
+    color: #fff;
+}
+
+/* ========================================= */
+/* 左邊側邊欄區域 */
+/* ========================================= */
+.left-sidebar {
+    position: relative;
+    /* 為了讓 resizer 可以絕對定位在右側 */
+    width: 240px;
+    min-width: 0;
+    /* 讓收合更流暢 */
+    background-color: #f5f5f5;
+    padding: 20px 0;
+    /* 移除水平 Padding，讓內容可以貼邊 */
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    box-shadow: 1px 0 0 #d0d0d0;
+    z-index: 20;
+    transition: width 0.3s ease, min-width 0.3s ease, max-width 0.3s ease, padding 0.3s ease, gap 0.3s ease;
+    overflow-x: hidden;
+    /* 禁止水平捲軸，改用省略號處理溢出 */
+    overflow-y: auto;
+}
+
+/* 在拖拽調整大小或執行開合動畫時，強制隱藏水平滾輪以防止閃爍，但保留垂直滾輪功能 */
+.left-sidebar.resizing,
+.left-sidebar.resizing .workspace-list,
+.left-sidebar.is-animating,
+.left-sidebar.is-animating .workspace-list {
+    overflow-x: hidden !important;
+}
+
+.left-sidebar.resizing {
+    transition: none !important;
+    /* 拖拽時關閉動畫以免遲滯 */
+}
+
+.left-sidebar.collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    overflow: hidden;
+}
+
+.sidebar-resizer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 4px;
+    /* 稍微縮小寬度，靠邊界感更強 */
+    height: 100%;
+    cursor: ew-resize;
+    background-color: transparent;
+    border-right: 1px solid rgba(0, 0, 0, 0.05);
+    /* 常駐的極淡線條暗示可縮放 */
+    z-index: 200;
+    transition: background-color 0.2s, border-right 0.2s;
+}
+
+.sidebar-resizer:hover,
+.sidebar-resizer.resizing {
+    background-color: #007acc;
+    /* 拖拽或懸停時顯示藍色條 */
+    border-right: 1px solid #007acc;
+}
+
+/* 將水平內距補回給非列表的元件，並防止縮小 */
+.group-title,
+.project-info,
+.workspace-actions {
+    padding: 0 15px;
+    min-width: 0;
+    /* 移除強制最小寬度，允許內容隨側邊欄縮小 */
+    flex-shrink: 0;
+    box-sizing: border-box;
+    width: 100%;
+    overflow: hidden;
+}
+
+.group-title {
+    font-weight: 600;
+    color: #666;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.project-info {
+    margin-bottom: 5px;
+}
+
+#projectNameInput {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+/* 2x2 快捷操作矩陣 */
+.project-action-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.project-action-grid button {
+    padding: 6px 4px;
+    font-size: 12px;
+    background-color: #eee;
+    color: #333;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    transition: all 0.2s;
+    height: 32px;
+}
+
+.project-action-grid button:hover {
+    background-color: #e0e0e0;
+    border-color: #ccc;
+}
+
+.project-action-grid button:active {
+    background-color: #d0d0d0;
+    transform: translateY(1px);
+}
+
+/* 專案統計資訊 */
+.project-stats {
+    font-size: 11px;
+    color: #888;
+    margin-top: 10px;
+    padding: 0 2px;
+    border-top: 1px dashed #ddd;
+    padding-top: 8px;
+}
+
+.workspace-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+
+.workspace-actions button {
+    padding: 8px;
+    font-size: 12px;
+    background-color: #eee;
+    color: #333;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.2s;
+}
+
+.workspace-actions button:hover {
+    background-color: #e0e0e0;
+}
+
+/* 工作區列表項樣式 */
+.workspace-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0px;
+    /* 緊湊排列 */
+    overflow-y: auto;
+    overflow-x: auto;
+    /* 允許水平捲軸 */
+    flex: 1;
+}
+
+.workspace-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 4px;
+    margin: 2px 8px;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s;
+    user-select: none;
+    position: relative;
+    color: #555;
+    border: 1px solid transparent;
+    gap: 6px;
+
+    /* 預設行為：不撐開，適應側邊欄寬度 */
+    width: auto;
+    min-width: 0;
+    flex-shrink: 0;
+    box-sizing: border-box;
+}
+
+/* 當內部的 input 獲得焦點時，讓項目轉為根據內容撐開 */
+.workspace-item:has(.workspace-name-input:focus) {
+    width: max-content;
+    min-width: 100%;
+}
+
+/* 停用狀態樣式 */
+.workspace-item.disabled {
+    color: #bbb;
+}
+
+/* 拖拽手柄樣式 */
+.drag-handle {
+    cursor: move;
+    opacity: 0;
+    color: #999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.2s;
+    font-size: 14px;
+    width: 16px;
+    flex-shrink: 0;
+}
+
+/* 工作區勾選框 */
+.ws-checkbox {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    accent-color: #7c3aed;
+    /* 使用紫色勾選色 */
+    flex-shrink: 0;
+}
+
+.workspace-item:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+.workspace-item:hover .drag-handle {
+    opacity: 1;
+}
+
+/* --- Active: 框選效果 --- */
+.workspace-item.active {
+    background-color: #f5f3ff;
+    border-color: #7c3aed;
+    color: #7c3aed;
+}
+
+.workspace-item.active .drag-handle {
+    color: #7c3aed;
+}
+
+/* 拖拽狀態樣式 */
+.workspace-item.dragging {
+    opacity: 0.4;
+    background-color: #f0f0f0;
+}
+
+.workspace-item.drag-over-top {
+    border-top: 2px solid #7c3aed;
+}
+
+.workspace-item.drag-over-bottom {
+    border-bottom: 2px solid #7c3aed;
+}
+
+/* 工作區原地編輯輸入框 - 基礎樣式 */
+.workspace-name-input {
+    flex: 1;
+    background: transparent;
+    border: 1px solid transparent;
+    color: inherit;
+    font-size: 13px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    outline: none;
+    transition: all 0.2s;
+
+    /* 預設：顯示省略號，不撐開 */
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    /* 核心邏輯：預設禁止點擊，讓點擊事件透傳給父層以切換 Active；Active 後才允許編輯 */
+    pointer-events: none;
+    cursor: inherit;
+}
+
+/* 聚焦編輯時：展開寬度 */
+.workspace-name-input:focus {
+    flex: none;
+    width: auto;
+    text-overflow: clip;
+    overflow: visible;
+}
+
+/* 當 Workspace 是 Active 時，允許點擊並顯示文字游標（不論是否停用） */
+.workspace-item.active .workspace-name-input {
+    pointer-events: auto;
+    cursor: text;
+    color: #7c3aed;
+    font-weight: 500;
+}
+
+/* 停用狀態下的輸入框樣式（僅保留裝飾性，移除 pointer-events 禁止） */
+.workspace-item.disabled .workspace-name-input {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+/* 聚焦編輯時的樣式 */
+.workspace-name-input:focus {
+    background: white;
+    border-color: #ddd;
+    color: #333 !important;
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.1);
+}
+
+/* 操作按鈕容器 */
+.ws-item-actions {
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    /* 預設隱藏 */
+    transition: opacity 0.2s;
+}
+
+.workspace-item:hover .ws-item-actions {
+    opacity: 1;
+    /* 懸停時顯示 */
+}
+
+.ws-item-btn {
+    background: none;
+    border: none;
+    padding: 2px;
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: inherit;
+    opacity: 0.7;
+}
+
+.ws-item-btn:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    opacity: 1;
+}
+
+.workspace-item:not(.active) .ws-item-btn:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Workspace Status Icons */
+.ws-status-icon {
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    margin: 0 2px;
+    position: relative;
+}
+
+.ws-status-waiting::before {
+    content: "⏳";
+    /* 待命 */
+    animation: ws-shake 0.8s ease-in-out infinite;
+    display: inline-block;
+}
+
+.ws-status-running::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    border: 2px solid #7c3aed;
+    border-top: 2px solid transparent;
+    border-radius: 50%;
+    animation: ws-spin 1s linear infinite;
+    display: inline-block;
+    box-sizing: content-box;
+}
+
+.ws-status-success::before {
+    content: "";
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid #22c55e;
+    /* 綠色中空圓圈 */
+    border-radius: 50%;
+    display: block;
+}
+
+.ws-status-success::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 45%;
+    width: 3.5px;
+    height: 7px;
+    border: solid #22c55e;
+    border-width: 0 1.5px 1.5px 0;
+    transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.ws-status-error::before {
+    content: "";
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid #ef4444;
+    /* 紅色中空圓圈 */
+    border-radius: 50%;
+    display: block;
+}
+
+.ws-status-error::after {
+    content: "×";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    color: #ef4444;
+    font-size: 16px;
+    font-weight: bold;
+    line-height: 1;
+}
+
+/* Has Report State - Document Icon with Badge */
+.ws-status-icon.has-report {
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+}
+
+.ws-status-icon.has-report::before {
+    content: "";
+    width: 12px;
+    height: 15px;
+    background-color: #fff;
+    border: 1px solid #666;
+    border-radius: 1px;
+    position: relative;
+    top: -1px;
+    box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.1);
+    display: block;
+}
+
+/* Success Badge on Report */
+.ws-status-success.has-report::after {
+    content: "✓";
+    position: absolute;
+    bottom: -1px;
+    right: -2px;
+    background-color: #22c55e;
+    color: white;
+    font-size: 8px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid white;
+    transform: none;
+    font-weight: bold;
+    top: auto;
+    left: auto;
+}
+
+/* Error Badge on Report */
+.ws-status-error.has-report::after {
+    content: "×";
+    position: absolute;
+    bottom: -1px;
+    right: -2px;
+    background-color: #ef4444;
+    color: white;
+    font-size: 10px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid white;
+    transform: none;
+    font-weight: bold;
+    top: auto;
+    left: auto;
+    line-height: 1;
+}
+
+.ws-status-icon.has-report:hover {
+    filter: brightness(1.1);
+    transform: scale(1.1);
+}
+
+@keyframes ws-spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes ws-shake {
+
+    0%,
+    100% {
+        transform: rotate(0deg);
+    }
+
+    25% {
+        transform: rotate(-15deg);
+    }
+
+    75% {
+        transform: rotate(15deg);
+    }
+}
+
+/* ========================================= */
+/* 右邊側邊欄區域 (15%) */
+/* ========================================= */
+/* 側邊欄基礎樣式 */
+.sidebar {
+    width: 15%;
+    /* 改用固定寬度或基礎寬度 */
+    min-width: 150px;
+    background-color: #f5f5f5;
+    padding: 0 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    box-shadow: -1px 0 0 #d0d0d0;
+    z-index: 10;
+    position: relative;
+    transition: all 0.3s ease;
+    /* 寬度與 Padding 的過渡動畫 */
+}
+
+/* 收納狀態的樣式 */
+.sidebar.collapsed {
+    width: 40px;
+    /* 收納後的寬度 */
+    min-width: 40px;
+    padding: 0;
+    /* 收合時移除所有內距 */
+    gap: 0;
+    /* 收合時移除間距 */
+}
+
+/* 收合時，按鈕本身也要調整 */
+.sidebar.collapsed .sidebar-toggle {
+    margin: 0;
+    padding: 0;
+    justify-content: center;
+    /* 置中箭頭 */
+    border-bottom: none;
+    /* 移除底線 */
+}
+
+/* 功能群組容器 (白色卡片) */
+.sidebar-group {
+    background-color: #ffffff;
+    /* 白色背景 */
+    border: 1px solid #e0e0e0;
+    /* 極淡的邊框 */
+    border-radius: 8px;
+    /* 圓角 */
+    padding: 12px;
+    /* 內距 */
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    /* 按鈕之間的間距 */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    /* 微微的浮起感 */
+}
+
+/* 確保中間的 Group 會撐開空間，把 About 擠到下面 */
+.sidebar-group:last-of-type {
+    margin-top: auto;
+}
+
+/* 群組小標題 */
+.group-title {
+    font-size: 12px;
+    font-weight: bold;
+    color: #888;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    /* 轉大寫，看起來像標籤 */
+    letter-spacing: 0.5px;
+}
+
+/* ========================================= */
+/* 側邊欄縮合 (Collapsed) 時的群組進化樣式 */
+/* ========================================= */
+/* 取消強制隱藏，改為透明無邊框，變成單純的圖示容器 */
+.sidebar.collapsed .sidebar-group {
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 5px;
+}
+
+/* 縮合時隱藏文字標題與燈號 */
+.sidebar.collapsed .group-title {
+    display: none;
+}
+
+/* ========================================= */
+/* 按鈕圖示化 (利用 data-icon 偽元素) */
+/* ========================================= */
+.sidebar button {
+    position: relative;
+    /* 供縮合時絕對定位使用 */
+}
+
+/* 展開狀態：在文字左邊加上 data-icon 圖示 */
+.sidebar button::before {
+    content: attr(data-icon);
+    margin-right: 8px;
+    font-size: 14px;
+}
+
+/* 縮合狀態：讓文字變透明隱藏，並把圖示強制置中放大 */
+.sidebar.collapsed button {
+    color: transparent !important;
+    /* 隱藏原始文字 */
+    padding: 12px 0;
+    /* 縮小按鈕高度與內距 */
+}
+
+.sidebar.collapsed button::before {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 18px;
+    /* 縮合時圖示放大 */
+    margin-right: 0;
+    color: white !important;
+    /* 確保非 emoji 的符號能顯示白色 */
+}
+
+/* ========================================= */
+/* 縮合狀態：Hover 時的高級自定義 Tooltip (浮動文字) */
+/* ========================================= */
+/* 利用 ::after 偽元素，讀取 HTML 上的 data-tooltip 屬性來畫出黑色提示框 */
+.sidebar.collapsed button::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    /* 定位在按鈕的左側，並向左推出 10px 的距離 */
+    right: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%);
+
+    /* IDE 風格的黑底白字小方塊 */
+    background-color: #252526;
+    color: #cccccc;
+    border: 1px solid #454545;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: normal;
+    white-space: nowrap;
+    /* 強制文字不換行 */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+
+    /* 預設隱藏並帶有滑動動畫效果 */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    /* 防止滑鼠干擾到提示框 */
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 1000;
+}
+
+/* 加上一個指向右邊的小三角形 (對話框的尾巴) */
+.sidebar.collapsed button:hover::after {
+    opacity: 1;
+    visibility: visible;
+    /* 滑鼠移上去時，從右往左滑進來一點點 (增加動態感) */
+    transform: translateY(-50%) translateX(-5px);
+}
+
+/* 切換按鈕樣式 */
+.sidebar-toggle {
+    height: 50px;
+    background-color: #f0f0f0;
+    color: #333;
+    border-bottom: 1px solid #ccc;
+    margin: 0 -20px;
+    padding: 0 20px;
+    display: flex;
+    justify-content: flex-start;
+    /* 靠左對齊 */
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+/* 箭頭文字 - 加大字體 */
+#toggleArrow {
+    transition: transform 0.3s ease;
+    display: inline-block;
+    font-size: 20px;
+    font-weight: bold;
+    line-height: 1;
+    /* 確保垂直置中 */
+}
+
+/* 滑鼠懸停在箭頭上時稍微變亮，增加互動感 */
+.sidebar-toggle:hover {
+    background-color: #e0e0e0;
+}
+
+/* 展開時箭頭朝右 (原本)，收納時箭頭朝左 */
+.sidebar-toggle.collapsed #toggleArrow {
+    transform: rotate(180deg);
+}
+
+.sidebar button {
+    padding: 12px;
+    font-size: 14px;
+    cursor: pointer;
+    background-color: #007acc;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    transition: background-color 0.3s, transform 0.1s;
+    /* 讓顏色變換平滑一點 */
+}
+
+.sidebar button:active {
+    transform: scale(0.98);
+    /* 點擊時有壓下去的效果 */
+}
+
+.sidebar button:hover {
+    background-color: #0098ff;
+}
+
+button:disabled {
+    background-color: #ccc !important;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* ========================================= */
+/* Toast 通知訊息樣式 (取代 alert)          */
+/* ========================================= */
+#toast {
+    visibility: hidden;
+    /* 預設隱藏 */
+    min-width: 250px;
+    margin-left: -125px;
+    /* 為了置中 */
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    border-radius: 4px;
+    padding: 16px;
+    position: fixed;
+    z-index: 999;
+    left: 50%;
+    bottom: 30px;
+    font-size: 14px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    transition: opacity 0.5s, bottom 0.5s;
+}
+
+/* 顯示時的樣式 */
+#toast.show {
+    visibility: visible;
+    opacity: 1;
+    bottom: 50px;
+    /* 稍微往上浮動的效果 */
+}
+
+/* 彈出視窗遮罩 */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+/* 視窗主體 */
+.modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    width: 80%;
+    max-height: 80%;
+    overflow: auto;
+    position: relative;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 15px;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #333;
+}
+
+.close-btn {
+    background: none !important;
+    border: none !important;
+    color: #333 !important;
+    font-size: 28px !important;
+    padding: 0 !important;
+    cursor: pointer;
+}
+
+/* 狀態燈容器 */
+.status-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-left: 8px;
+    vertical-align: middle;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    transition: background 0.3s ease;
+}
+
+/* 燈號顏色 */
+.led-orange {
+    background: radial-gradient(circle at 4px 4px, #ffb347, #ff8c00);
+    box-shadow: 0 0 5px #ff8c00;
+}
+
+.led-green {
+    background: radial-gradient(circle at 4px 4px, #a8ff78, #20e3b2);
+    box-shadow: 0 0 5px #20e3b2;
+}
+
+.led-yellow {
+    background: radial-gradient(circle at 4px 4px, #fff720, #ffcc00);
+    box-shadow: 0 0 5px #ffcc00;
+}
+
+/* 閃爍動畫 */
+@keyframes blink {
+    0% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.3;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+/* ==========================================
+I2C Operations 專屬樣式
+========================================== */
+#i2cLog {
+    padding: 0px !important;
+    /* 強制拔除原本為文字設計的內邊距 */
+    overflow: hidden !important;
+    /* 關閉外層捲軸，避免雙重捲軸 */
+    padding: 0px !important;
+    overflow: hidden !important;
+}
+
+/* 只有當被點擊啟動 (加上 active) 時，才把它變成 flex 排版 */
+#i2cLog.active {
+    display: flex !important;
+    flex-direction: column;
+}
+
+.i2c-container {
+    display: flex;
+    height: 100%;
+    padding: 0px 10px;
+    box-sizing: border-box;
+    gap: 15px;
+    color: #d4d4d4;
+}
+
+/* 左側控制區 */
+.i2c-controls {
+    flex: 0 0 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    justify-content: flex-start;
+    padding-top: 12px;
+}
+
+.i2c-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.i2c-row label {
+    flex: 0 0 80px;
+    text-align: right;
+    font-family: monospace;
+    font-size: 13px;
+    /* 字體微調小 */
+}
+
+/* 輸入框與下拉選單的暗黑風格 (緊湊) */
+.i2c-row input[type="text"],
+.i2c-row select {
+    background-color: #2d2d2d;
+    border: 1px solid #555;
+    color: #fff;
+    padding: 1px 6px;
+    font-family: monospace;
+    font-size: 13px;
+    height: 22px;
+    box-sizing: border-box;
+}
+
+.i2c-row input[type="text"] {
+    /* 讓輸入框變成「彈性變數」，自動撐開填滿中間的所有空間！ */
+    flex: 1;
+    min-width: 100px;
+}
+
+.i2c-row select {
+    /* 稍微加寬選單，確保 "16bits" 字樣不會被切掉 */
+    flex: 0 0 80px;
+    cursor: pointer;
+}
+
+.i2c-row .spacer {
+    /* 與下拉選單等寬，用來佔位對齊第一行 */
+    flex: 0 0 80px;
+}
+
+/* 下方按鈕區 (緊湊) */
+.i2c-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+    /* 讓按鈕群精準對齊上方的輸入框*/
+    padding-left: 88px;
+}
+
+.i2c-actions button {
+    background-color: #3e3e42;
+    border: 1px solid #555;
+    color: #d4d4d4;
+    padding: 3px 8px;
+    cursor: pointer;
+    font-size: 12px;
+    border-radius: 2px;
+    transition: background-color 0.2s, border-color 0.2s;
+    flex: 1;
+    /* 三顆按鈕平分寬度 */
+}
+
+.i2c-actions button:hover {
+    background-color: #505050;
+    border-color: #777;
+    color: #fff;
+}
+
+.i2c-actions button:active {
+    background-color: #2d2d2d;
+}
+
+/* 讓按鈕被禁用時變暗，並且游標變成禁止符號 */
+.i2c-actions button:disabled {
+    background-color: #2d2d2d !important;
+    color: #666 !important;
+    border-color: #444 !important;
+    cursor: not-allowed !important;
+}
+
+/* 右側 Log 區 */
+.i2c-log-area {
+    flex: 1;
+    background-color: #1e1e1e;
+    border: 1px solid #444;
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* I2C Log 顯示區的高度壓縮設定 */
+.i2c-terminal {
+    flex: 1;
+    padding: 4px 8px;
+    /* 縮小內縮距離 */
+    overflow-y: auto;
+    overflow-x: auto;
+    /* 允許橫向捲動 保護對齊格式 */
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 12.5px;
+    /* 字體再稍微調小一點點 看起來更像系統終端機 */
+    line-height: 1.15;
+    /* 將行高壓縮 極大化單頁顯示行數 */
+    background-color: #1e1e1e;
+}
+
+/* 讓裡面的每一行（剛剛 JS 建出來的 div）繼承行高 */
+.i2c-terminal>div {
+    line-height: 1.15;
+}
+
+/* ==========================================
+   OVDB File Opt 專屬樣式 (左右雙面板佈局)
+   ========================================== */
+#ovdbLog {
+    padding: 0px !important;
+    overflow: hidden !important;
+}
+
+#ovdbLog.active {
+    display: flex !important;
+    flex-direction: column;
+}
+
+.ovdb-container {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    gap: 15px;
+    padding: 10px;
+    box-sizing: border-box;
+    background-color: #1e1e1e;
+}
+
+.ovdb-panel {
+    background-color: #252526;
+    border: 1px solid #333;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* 左側：固定寬度，改為靠上對齊 */
+.ovdb-left {
+    flex: 0 0 420px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    /* 靠上對齊 */
+    align-items: stretch;
+    /* 讓內部元素左右撐滿 */
+    gap: 12px;
+    /* 按鈕與清單的間距 */
+    padding: 15px;
+}
+
+.ovdb-left button {
+    padding: 8px;
+    font-size: 13px;
+    font-weight: bold;
+    background-color: #0e639c;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ovdb-left button:hover:not(:disabled) {
+    background-color: #1177bb;
+}
+
+.ovdb-left button:disabled {
+    background-color: #444 !important;
+    color: #888 !important;
+    cursor: not-allowed;
+}
+
+.ovdb-file-list {
+    flex: 1;
+    /* 填滿按鈕下方剩下的所有高度 */
+    background-color: #ffffff;
+    /* 白底 */
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    overflow-y: auto;
+    /* 內容過多時可垂直滾動 */
+    padding: 4px;
+}
+
+.ovdb-list-item {
+    padding: 6px 10px;
+    color: #333;
+    font-size: 12px;
+    font-family: 'Consolas', monospace;
+    /* 適合顯示檔名或資料 */
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+    border-radius: 2px;
+    transition: background-color 0.2s;
+}
+
+.ovdb-list-item:last-child {
+    border-bottom: none;
+    /* 最後一項不需要底線 */
+}
+
+.ovdb-list-item:hover {
+    background-color: #e6f2ff;
+    /* 滑鼠懸停時的淺藍色 */
+}
+
+.ovdb-list-item.selected {
+    background-color: #007acc;
+    /* 點選後的深藍色 */
+    color: white;
+}
+
+/* 右側：Log 顯示區，佔滿剩餘空間 */
+.ovdb-right {
+    flex: 1;
+    padding: 10px;
+}
+
+.ovdb-log-content {
+    flex: 1;
+    overflow-y: auto;
+    font-family: 'Consolas', monospace;
+    font-size: 13px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    color: #cccccc;
+}
+
+/* ==========================================
+    Camera Preview (Stream) 專屬樣式
+    ========================================== */
+/* 預設狀態 確保它乖乖隱藏 */
+#streamLog {
+    display: none;
+}
+
+/* 啟動狀態 只有被掛上 active 時 才使用 Flex 垂直排版向上靠齊 */
+#streamLog.active {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    justify-content: flex-start;
+}
+
+.stream-toolbar {
+    display: flex;
+    gap: 15px;
+    padding: 8px 15px;
+    background-color: #252526;
+    border-bottom: 1px solid #3c3c3c;
+    align-items: center;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+.stream-toolbar select,
+.stream-toolbar input {
+    background: #3c3c3c;
+    color: #ccc;
+    border: 1px solid #555;
+    padding: 4px 8px;
+    border-radius: 3px;
+}
+
+.stream-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    /* 兩欄 */
+    grid-template-rows: 1fr 1fr;
+    /* 兩列 */
+    gap: 0px;
+    /* 0px 消除所有網格間距 */
+    background-color: #1e1e1e;
+    flex-grow: 1;
+    /* 自動延伸並吃掉下方所有剩餘空間 */
+    overflow: hidden;
+}
+
+.stream-cell {
+    position: relative;
+    background-color: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.stream-cell img {
+    max-width: 100%;
+    max-height: 100%;
+    /* 保持長寬比 自動縮放塞滿容器 */
+    object-fit: contain;
+}
+
+/* ==========================================
+    Camera Preview - 懸浮 VC 工具列
+    ========================================== */
+.stream-toolbar {
+    display: flex;
+    justify-content: flex-start;
+    /* 按鈕靠左靠上 */
+    padding: 8px 15px;
+    background-color: #252526;
+    border-bottom: 1px solid #3c3c3c;
+    flex-shrink: 0;
+}
+
+.stream-cell {
+    position: relative;
+    background-color: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    /* 防止懸浮列凸出去 */
+    cursor: pointer;
+    /* 讓滑鼠移上去有可點擊的提示 */
+}
+
+.stream-cell img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+    /* 讓點擊事件直接穿透給底層的 stream-cell */
+}
+
+/* 每個 VC 上方的半透明懸浮設定列 */
+.vc-toolbar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background-color: rgba(37, 37, 38, 0.85);
+    /* 半透明深灰 */
+    display: flex;
+    gap: 8px;
+    padding: 6px 10px;
+    align-items: center;
+    box-sizing: border-box;
+    transition: transform 0.25s ease-in-out;
+    /* 平滑收合動畫 */
+    z-index: 10;
+    cursor: default;
+    /* 工具列區域滑鼠恢復預設 */
+}
+
+/* 隱藏狀態 將工具列往上推移出可見範圍 */
+.vc-toolbar.hidden {
+    transform: translateY(-100%);
+}
+
+.vc-toolbar select,
+.vc-toolbar input {
+    background: #333;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 3px;
+    padding: 2px 4px;
+    font-size: 12px;
+}
+
+.vc-toolbar input[type="number"] {
+    width: 55px;
+    text-align: center;
+}
+
+.vc-title {
+    font-weight: bold;
+    color: #4ec9b0;
+    margin-right: 10px;
+    font-family: monospace;
+}
+
+/* 鎖定狀態下的樣式 */
+.vc-toolbar select:disabled,
+.vc-toolbar input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+#streamToggleBtn {
+    background-color: #0e639c;
+    /* 預設藍色啟動按鈕 */
+    color: white;
+    font-weight: bold;
+    min-width: 120px;
+}
+
+#streamToggleBtn.streaming {
+    background-color: #d9534f;
+    /* 串流中變成紅色停止按鈕 */
+}
+
+.stream-toolbar {
+    display: flex;
+    align-items: center;
+}
+
+/* 雙擊最大化佈局樣式 */
+.stream-grid.maximized-mode .stream-cell:not(.maximized) {
+    display: none !important;
+}
+
+.stream-grid.maximized-mode .stream-cell.maximized {
+    grid-column: 1 / -1;
+    grid-row: 1 / -1;
+    width: 100%;
+    height: 100%;
+}
+
+.stream-grid.maximized-mode .stream-cell.maximized img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background-color: #000;
+}
+
+.throughput-text {
+    margin-left: auto;
+    /* 強制推到最右邊 */
+    margin-right: 15px;
+    color: #4ec9b0;
+    /* 與 I2C 終端機一致的綠色 */
+    font-family: 'Consolas', monospace;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+/* ==========================================
+    影像預覽 FPS 浮動計數器
+    ========================================== */
+.stream-cell {
+    position: relative;
+    /* 讓內部的絕對定位元素以這裡為基準 */
+}
+
+.fps-counter {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background-color: rgba(0, 0, 0, 0.65);
+    color: #00FF00;
+    /* 經典終端機螢光綠 */
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 14px;
+    font-weight: bold;
+    pointer-events: none;
+    /* 讓滑鼠點擊穿透，不會擋到畫面操作 */
+    z-index: 10;
+    display: none;
+    /* 預設隱藏，開始串流時才顯示 */
+}
+
+/* EMBL Preview Layout */
+#emblLog.active {
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: hidden;
+}
+
+.embl-header {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 10px;
+    padding: 4px 10px !important;
+    margin: 0 !important;
+    align-items: center;
+    border-bottom: 1px solid #555;
+    background: inherit;
+}
+
+.embl-header select,
+.embl-header button,
+.embl-header input {
+    margin: 0 !important;
+    height: 24px;
+    line-height: 1;
+    box-sizing: border-box;
+}
+
+.embl-main {
+    flex: 1 1 auto;
+    display: flex;
+    overflow: hidden;
+}
+
+.embl-left {
+    width: 75%;
+    padding: 0;
+    border-right: 1px solid #555;
+    overflow: auto;
+    font-family: monospace;
+    box-sizing: border-box;
+    background: #1e1e1e;
+}
+
+.embl-right {
+    width: 25%;
+    padding: 10px;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+/* EMBL Grid Table */
+.embl-grid-table {
+    border-collapse: collapse;
+    text-align: center;
+    font-family: monospace;
+    white-space: nowrap;
+    font-size: 12px;
+    background: #1e1e1e;
+}
+
+.embl-grid-table th,
+.embl-grid-table td {
+    border: 1px solid #444;
+    padding: 2px 6px;
+    min-width: 40px;
+}
+
+/* freeze top header */
+.embl-grid-table th {
+    background: #333;
+    color: #fff;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+/* freeze left address column */
+.embl-grid-table .addr-cell {
+    background: #2d2d2d;
+    color: #4ec9b0;
+    font-weight: bold;
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    vertical-align: middle;
+}
+
+/* corner cell highest z-index */
+.embl-grid-table th:first-child {
+    z-index: 3;
+    left: 0;
+}
+
+/* field and value styles */
+.embl-grid-table .field-name {
+    background: #2a2a2a;
+    color: #aaa;
+    font-size: 10px;
+}
+
+.embl-grid-table .field-value {
+    color: #dcdcaa;
+}
+
+/* EMBL Right Panel Config */
+.embl-cfg-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    height: 100%;
+}
+
+.embl-cfg-title {
+    font-weight: bold;
+    color: #4ec9b0;
+    font-size: 14px;
+}
+
+.embl-cfg-list {
+    flex: 1;
+    overflow-y: auto;
+    border: 1px solid #444;
+    background: #1e1e1e;
+    padding: 5px;
+}
+
+.embl-cfg-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px;
+    border-bottom: 1px solid #333;
+    font-size: 12px;
+    color: #ccc;
+    font-family: monospace;
+}
+
+.embl-cfg-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: #2d2d2d;
+    padding: 10px;
+    border: 1px solid #555;
+}
+
+.embl-cfg-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.embl-cfg-row input,
+.embl-cfg-row select,
+.embl-cfg-row button {
+    height: 24px;
+    box-sizing: border-box;
+    margin: 0;
+    font-size: 12px;
+}
+
+.embl-cfg-row input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    background: #1e1e1e;
+    color: #fff;
+    border: 1px solid #555;
+    padding: 0 5px;
+}
+
+.embl-cfg-row select {
+    background: #1e1e1e;
+    color: #fff;
+    border: 1px solid #555;
+}
+
+.blink {
+    animation: blink 0.8s infinite;
+}
+
+.mermaid-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+/* ==========================================
+   System Panel Resizer
+   ========================================== */
+.console-resizer {
+    width: 100%;
+    height: 10px;
+    background: transparent;
+    /* 平時透明 */
+    cursor: ns-resize;
+    position: absolute;
+    top: -5px;
+    /* 讓它一半在面板內，一半在面板外 */
+    left: 0;
+    z-index: 9999;
+    /* 確保擋在所有標籤按鈕前面 */
+}
+
+/* 當父元件 console-area 有 .collapsed 類別時，隱藏把手 */
+.console-area.collapsed .console-resizer {
+    display: none;
+}
+
+/* 滑鼠移上去時顯示一條亮藍色的線，提示這裡可以拉 */
+.console-resizer:hover {
+    background: rgba(0, 122, 204, 0.8);
+    box-shadow: 0 0 5px rgba(0, 122, 204, 0.5);
+}
+
+/* 拖拉時暫時取消動畫，不然會感覺「跟不上」滑鼠 */
+.console-area.resizing {
+    transition: none !important;
+}

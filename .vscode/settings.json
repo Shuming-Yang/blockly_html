@@ -92,5 +92,52 @@
     "cmake.preferredGenerators": ["Ninja"],
     "cmake.configureSettings": {
         "CMAKE_MAKE_PROGRAM": "${workspaceFolder}/tools/ninja/win/ninja.exe"
-    }
+    },
+    // 強制設定預設開啟畫面為 Form 模式
+    "commit-message-editor.view.defaultView": "form",
+    // 修正 text 模式下的載入範本
+    "commit-message-editor.staticTemplate": [
+        "{type} {subject}{body}"
+    ],
+    // 修正 form 模式下的輸出範本，確保不含 {scope} 等預設字串
+    "commit-message-editor.dynamicTemplate": [
+        "{type} {subject}{body}"
+    ],
+    "commit-message-editor.tokens": [
+        {
+            "label": "Prefix Type",
+            "name": "type",
+            "type": "enum",
+            "description": "Select category based on files changed",
+            "options": [
+                { "label": "[BACKEND]", "value": "[BACKEND]", "description": "Files: *.py" },
+                { "label": "[GUI]", "value": "[GUI]", "description": "Files: *.html, *.css, *.js" },
+                { "label": "[CMAKE]", "value": "[CMAKE]", "description": "Files: *.cmake, cmakelists.txt" },
+                { "label": "[BLOCKLY]", "value": "[BLOCKLY]", "description": "Path: application/blockly/*" },
+                { "label": "[MERMAID]", "value": "[MERMAID]", "description": "Path: application/mermaid/*" },
+                { "label": "[MEDIA]", "value": "[MEDIA]", "description": "Path: application/media/*" },
+                { "label": "[RELEASE]", "value": "[RELEASE]", "description": "Path: release/*.exe" },
+                { "label": "[DOCS]", "value": "[DOCS]", "description": "Path: doc/*, Files: *.md" },
+                { "label": "[TOOLS]", "value": "[TOOLS]", "description": "Path: tools/*" },
+                { "label": "[GIT]", "value": "[GIT]", "description": "Files: .gitignore, .gitattributes" },
+                { "label": "[VSCODE]", "value": "[VSCODE]", "description": "Path: .vscode/*" }
+            ]
+        },
+        {
+            "label": "Change Description",
+            "name": "subject",
+            "type": "text",
+            "multiline": false,
+            "description": "Brief English description"
+        },
+        {
+            "label": "Body (Optional)",
+            "name": "body",
+            "type": "text",
+            "multiline": true,
+            "description": "Step 3: Detailed description. Leave empty to skip.",
+            // 只有當 body 有內容時，才會在前面加上兩個換行
+            "prefix": "\n\n"
+        }
+    ]
 }
